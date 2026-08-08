@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
+import { PublicBackground } from "@/components/PublicBackground";
 
 // Halaman publik (tidak perlu login) — daftar seleksi yang tahapan
 // pendaftarannya (status = REGISTRATION) sedang dibuka. Ditopang oleh RLS
@@ -13,7 +14,8 @@ export default async function DaftarIndexPage() {
     .order("tahun", { ascending: false });
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-navy-950 via-navy-900 to-navy-800 p-6">
+    <PublicBackground>
+    <div className="min-h-screen p-6">
       <div className="max-w-2xl mx-auto pt-10">
         <div className="flex items-center gap-3 mb-8">
           <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-gold-400 to-gold-700 flex items-center justify-center font-display font-extrabold text-navy-950">S</div>
@@ -52,5 +54,6 @@ export default async function DaftarIndexPage() {
         </div>
       </div>
     </div>
+    </PublicBackground>
   );
 }

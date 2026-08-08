@@ -193,21 +193,36 @@ database, and:
   only and audit-logged. A self-account-lock-out guard prevents an admin
   from deleting/deactivating/demoting their own currently-logged-in account.
 - **Public applicant self-registration** (`/daftar`) — see §3.6.
+- **Recommendation** (`/recommendation`) — full Draf → Review → Revisi →
+  Disetujui → Final workflow. Panitia Seleksi drafts and edits the
+  `ringkasan` and submits for review; only KPM / Pejabat Berwenang can
+  approve, send back for revision, or finalize (`recs_approve_kpm`).
+- **Decision** (`/decision`) — KPM / Pejabat Berwenang only
+  (`decisions_insert_kpm`) can issue a decision (`nomor`, `tanggal`)
+  referencing a `FINAL` recommendation; a recommendation can only be
+  referenced once. Decisions are append-only — no UPDATE/DELETE policy
+  exists on `public.decisions`, matching the Audit Trail's design.
+- **Announcement** (`/announcement`) — Panitia Seleksi / Administrator
+  Sistem can create (as `DRAFT`), publish, archive, revert to draft, and
+  delete; everyone else only ever sees `PUBLISHED` announcements, enforced
+  by `announcements_select_published`.
 
-**Schema + RLS ready, UI scaffolded with the exact pattern to follow**:
-Recommendation, Decision, Announcement — each placeholder page names the
-table, the relevant RLS policies already in `schema.sql`, and which existing
-module to copy (`app/(app)/assessment/` for the read+write pattern,
-`app/(app)/users/actions.ts` for the server-action pattern).
+**Visual**: every publicly reachable page (`/`, `/login`, `/daftar`,
+`/daftar/[selectionId]`, and its `/berhasil` confirmation) now shares a
+`PublicBackground` component (`components/PublicBackground.tsx`) — the
+Perumdam Among Tirto building photo at `public/images/gedung-perumdam.jpg`,
+rendered at 45% opacity, with the existing navy gradient layered on top so
+text stays readable. Swap the image file to rebrand; the opacity lives in
+the `opacity-45` class on the photo layer.
 
-**Not yet ported** (present in `index.html` as client-side simulation, not
-yet as Supabase tables/pages): Internal Nomination + Eligibility Engine UI,
-Document upload/verification UI (bucket + RLS policies exist, upload form
-doesn't yet), Interview module UI, Letter Generator UI (kop images are ready
-in Storage), Workflow Builder UI, Reports/CSV export, Notifications UI, AI
-Assistant. All of their tables and RLS policies already exist in
-`supabase/schema.sql` — porting each is the same three-step pattern used
-throughout this project:
+**Schema + RLS ready, UI not yet built** (present in `index.html` as
+client-side simulation, not yet as Next.js pages — all tables and RLS
+policies already exist in `supabase/schema.sql`; porting each is the same
+three-step pattern used throughout this project): Internal Nomination +
+Eligibility Engine UI, Document upload/verification UI (bucket + RLS
+policies exist, upload form doesn't yet), Interview module UI, Letter
+Generator UI (kop images are ready in Storage), Workflow Builder UI,
+Reports/CSV export, Notifications UI, AI Assistant.
 1. Server Component reads via the RLS-scoped `createClient()`.
 2. Server Action in an adjacent `actions.ts` writes via the same client
    (never the service-role client, except in `users/actions.ts` which is
