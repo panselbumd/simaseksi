@@ -1,0 +1,7 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root { --bg: #f6f7fb; }
+body { @apply bg-[--bg] text-ink-900 font-body antialiased; }
+h1,h2,h3,h4 { @apply font-display font-bold text-navy-900; }
