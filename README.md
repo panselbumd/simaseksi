@@ -68,6 +68,12 @@ Dashboard → **SQL Editor** → paste and run, in order:
    update): also run `supabase/migration_0001_akun_dan_pendaftaran.sql`.
    It is idempotent (`if not exists` / `drop policy if exists`), safe to
    run again.
+1c. **Existing project only** (schema.sql already applied before this
+   update): also run `supabase/migration_0002_security_definer_fix.sql`.
+   Fixes the Supabase Database Linter's `security_definer_view` finding on
+   `v_candidate_ranking` by setting `security_invoker = true`, so the view
+   runs with the querying user's RLS instead of the view owner's. Safe to
+   run again.
 2. `supabase/seed.sql` — demo BUMD, regulations, SOP, one selection, and its
    assessment components. (Tables that reference `auth.users` — profiles,
    applicants, candidates, scores — are seeded separately in step 3.4,
