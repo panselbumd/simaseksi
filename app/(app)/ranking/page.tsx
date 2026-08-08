@@ -19,7 +19,10 @@ export default async function RankingPage() {
 
   return (
     <div>
-      <h1 className="text-2xl font-display font-bold text-navy-900 mb-1">Ranking</h1>
+      <div className="flex items-center justify-between mb-1">
+        <h1 className="text-2xl font-display font-bold text-navy-900">Ranking</h1>
+        <a href="/ranking/export.csv" className="text-xs bg-navy-50 text-navy-800 font-semibold rounded-md px-3 py-1.5">Unduh CSV</a>
+      </div>
       <p className="text-sm text-ink-500 mb-6">Dihitung otomatis oleh view <code>v_candidate_ranking</code> — tidak ada jalur input manual di aplikasi maupun database.</p>
       <div className="bg-white border border-gray-200 rounded-md overflow-hidden">
         <table className="w-full text-sm">

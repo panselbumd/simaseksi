@@ -20,6 +20,12 @@ export const PERMISSIONS: Record<AppRole, string[]> = {
     "dashboard.view", "bumd.view", "bumd.manage", "regulation.view", "regulation.manage",
     "sop.view", "sop.manage", "selection.view", "candidate.view", "document.view",
     "audit.view", "user.manage", "settings.view",
+    // Announcements are public-relations content, not a substantive selection
+    // decision, so Admin shares this write with Panitia per the DB policy
+    // `announcements_manage_panitia` (role in PANITIA_SELEKSI, SYSTEM_ADMIN).
+    // Admin deliberately still has NO recommendation/decision/ranking-write
+    // access — see the "Admin = System Control" banner on /dashboard.
+    "announcement.view", "announcement.manage",
   ],
   PANITIA_SELEKSI: [
     "dashboard.view", "bumd.view", "regulation.view", "sop.view", "selection.view", "selection.manage",
@@ -30,7 +36,7 @@ export const PERMISSIONS: Record<AppRole, string[]> = {
     "announcement.view", "announcement.manage", "letter.view", "letter.manage", "report.view",
   ],
   TIM_UKK: ["dashboard.view", "ukk.view", "assessment.view", "assessment.score", "candidate.view", "schedule.view"],
-  PESERTA: ["self.view", "self.manage", "dashboard.view", "announcement.view", "schedule.view"],
+  PESERTA: ["self.view", "self.manage", "dashboard.view", "announcement.view", "schedule.view", "document.view"],
   KPM: [
     "dashboard.view", "selection.view", "candidate.view", "ranking.view", "assessment.view",
     "recommendation.view", "recommendation.approve", "decision.view", "decision.manage",

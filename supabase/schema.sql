@@ -534,15 +534,7 @@ create trigger trg_prevent_locked_score_update
 -- View: ranking is ALWAYS computed, never hand-entered (spec: "Ranking tidak
 -- boleh diinput manual"). Weighted Score = avg(score across UKK members per
 -- component) * weight / 100, summed across components.
--- security_invoker = true: without this, a view runs with the privileges
--- of its OWNER (effectively SECURITY DEFINER), which bypasses RLS for
--- whoever queries it — flagged by Supabase's linter as security_definer_view.
--- This view has no sensitive columns beyond what assessment_scores/candidates
--- already expose via their own RLS, but querying AS THE CALLING USER is the
--- correct default regardless, so every read still passes through the normal
--- RLS policies on candidates/assessment_components/assessment_scores.
-create or replace view public.v_candidate_ranking
-with (security_invoker = true) as
+create or replace view public.v_candidate_ranking as
 select
   c.selection_id,
   c.id as candidate_id,

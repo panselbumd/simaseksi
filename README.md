@@ -68,12 +68,6 @@ Dashboard → **SQL Editor** → paste and run, in order:
    update): also run `supabase/migration_0001_akun_dan_pendaftaran.sql`.
    It is idempotent (`if not exists` / `drop policy if exists`), safe to
    run again.
-1c. **Existing project only** (schema.sql already applied before this
-   update): also run `supabase/migration_0002_security_definer_fix.sql`.
-   Fixes the Supabase Database Linter's `security_definer_view` finding on
-   `v_candidate_ranking` by setting `security_invoker = true`, so the view
-   runs with the querying user's RLS instead of the view owner's. Safe to
-   run again.
 2. `supabase/seed.sql` — demo BUMD, regulations, SOP, one selection, and its
    assessment components. (Tables that reference `auth.users` — profiles,
    applicants, candidates, scores — are seeded separately in step 3.4,
@@ -192,43 +186,55 @@ That completes the full chain:
 
 **Fully wired end-to-end** (schema + RLS + server actions + UI): Auth/RBAC,
 BUMD, Selections, Candidates, Assessment & Scoring (with independent
-per-UKK-member locking), auto-computed Ranking, Audit Trail, Regulation
-database, and:
+per-UKK-member locking), auto-computed Ranking (+ CSV export), Audit Trail,
+Regulation database, and:
 - **User Management** — create, **edit** (`/users/[id]/edit`), **delete**
   (permanent, via `deleteUserAction`), and deactivate/reactivate, all admin-
   only and audit-logged. A self-account-lock-out guard prevents an admin
   from deleting/deactivating/demoting their own currently-logged-in account.
 - **Public applicant self-registration** (`/daftar`) — see §3.6.
-- **Recommendation** (`/recommendation`) — full Draf → Review → Revisi →
-  Disetujui → Final workflow. Panitia Seleksi drafts and edits the
-  `ringkasan` and submits for review; only KPM / Pejabat Berwenang can
-  approve, send back for revision, or finalize (`recs_approve_kpm`).
-- **Decision** (`/decision`) — KPM / Pejabat Berwenang only
-  (`decisions_insert_kpm`) can issue a decision (`nomor`, `tanggal`)
-  referencing a `FINAL` recommendation; a recommendation can only be
-  referenced once. Decisions are append-only — no UPDATE/DELETE policy
-  exists on `public.decisions`, matching the Audit Trail's design.
-- **Announcement** (`/announcement`) — Panitia Seleksi / Administrator
-  Sistem can create (as `DRAFT`), publish, archive, revert to draft, and
-  delete; everyone else only ever sees `PUBLISHED` announcements, enforced
-  by `announcements_select_published`.
+- **Rekomendasi** (`/recommendation`) — Draf → Review → Revisi → Disetujui →
+  Final. Panitia drafts/edits/submits; only KPM / Pejabat Berwenang can
+  approve, request revision, or finalize (`recs_approve_kpm`).
+- **Keputusan** (`/decision`) — issuing a decision letter is restricted to
+  KPM / Pejabat Berwenang only (`decisions_insert_kpm`); Admin and Panitia
+  cannot insert here even via a crafted request, since the RLS policy has
+  no clause for those roles at all.
+- **Pengumuman** (`/announcement`) — full CRUD (draft/publish/archive) for
+  Panitia + Admin; public/other roles only ever see `status = 'PUBLISHED'`
+  rows (`announcements_select_published`).
+- **Dokumen** (`/documents`) — Peserta upload each required file
+  (`REQUIRED_DOCUMENTS` in `app/(app)/documents/constants.ts`) to the
+  private `candidate-documents` Storage bucket; Panitia verifies
+  (Valid/Perlu Perbaikan/Tolak) via `documents_verify_panitia`. Files are
+  served back to authorized viewers only via short-lived signed URLs
+  (`getSignedDocumentUrl`), never a public bucket URL.
+- **Wawancara** (`/interview`) — Panitia schedules interviews per
+  candidate and records notes/score/recommendation
+  (`interviews_manage_panitia`).
 
-**Visual**: every publicly reachable page (`/`, `/login`, `/daftar`,
-`/daftar/[selectionId]`, and its `/berhasil` confirmation) now shares a
-`PublicBackground` component (`components/PublicBackground.tsx`) — the
-Perumdam Among Tirto building photo at `public/images/gedung-perumdam.jpg`,
-rendered at 45% opacity, with the existing navy gradient layered on top so
-text stays readable. Swap the image file to rebrand; the opacity lives in
-the `opacity-45` class on the photo layer.
+**Deliberately left out of this build** (flagged, not silently skipped):
+Internal Nomination + Eligibility Engine UI (schema/RLS exist —
+`internal_nominations`, `eligibility_rules`, `eligibility_assessments` —
+but this is a second, parallel candidate-intake workflow large enough to
+warrant its own pass), Letter Generator (needs a PDF/DOCX templating
+decision), Workflow Builder, Notifications UI, and an AI Assistant. Say
+the word if you want any of these next.
 
-**Schema + RLS ready, UI not yet built** (present in `index.html` as
-client-side simulation, not yet as Next.js pages — all tables and RLS
-policies already exist in `supabase/schema.sql`; porting each is the same
-three-step pattern used throughout this project): Internal Nomination +
-Eligibility Engine UI, Document upload/verification UI (bucket + RLS
-policies exist, upload form doesn't yet), Interview module UI, Letter
-Generator UI (kop images are ready in Storage), Workflow Builder UI,
-Reports/CSV export, Notifications UI, AI Assistant.
+**Schema + RLS ready, UI scaffolded with the exact pattern to follow**:
+Recommendation, Decision, Announcement — each placeholder page names the
+table, the relevant RLS policies already in `schema.sql`, and which existing
+module to copy (`app/(app)/assessment/` for the read+write pattern,
+`app/(app)/users/actions.ts` for the server-action pattern).
+
+**Not yet ported** (present in `index.html` as client-side simulation, not
+yet as Supabase tables/pages): Internal Nomination + Eligibility Engine UI,
+Document upload/verification UI (bucket + RLS policies exist, upload form
+doesn't yet), Interview module UI, Letter Generator UI (kop images are ready
+in Storage), Workflow Builder UI, Reports/CSV export, Notifications UI, AI
+Assistant. All of their tables and RLS policies already exist in
+`supabase/schema.sql` — porting each is the same three-step pattern used
+throughout this project:
 1. Server Component reads via the RLS-scoped `createClient()`.
 2. Server Action in an adjacent `actions.ts` writes via the same client
    (never the service-role client, except in `users/actions.ts` which is

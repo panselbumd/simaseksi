@@ -40,7 +40,8 @@ export async function updateSession(request: NextRequest) {
     path.startsWith("/selections") || path.startsWith("/candidates") ||
     path.startsWith("/assessment") || path.startsWith("/ranking") ||
     path.startsWith("/audit-log") || path.startsWith("/users") || path.startsWith("/announcement") ||
-    path.startsWith("/regulation") || path.startsWith("/recommendation") || path.startsWith("/decision");
+    path.startsWith("/regulation") || path.startsWith("/recommendation") || path.startsWith("/decision") ||
+    path.startsWith("/documents") || path.startsWith("/interview");
   // NOTE: "/daftar" (pendaftaran peserta publik) and "/login" are
   // intentionally left OUT of this list — they must stay reachable by
   // anonymous visitors.

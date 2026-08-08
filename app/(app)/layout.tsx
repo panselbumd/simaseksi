@@ -12,9 +12,11 @@ const NAV: { section: string; items: { href: string; label: string; perm: string
   { section: "Seleksi", items: [
     { href: "/selections", label: "Manajemen Seleksi", perm: "selection.view" },
     { href: "/candidates", label: "Kandidat", perm: "candidate.view" },
+    { href: "/documents", label: "Dokumen", perm: "document.view" },
   ]},
   { section: "Penilaian", items: [
     { href: "/assessment", label: "Assessment & Scoring", perm: "assessment.view" },
+    { href: "/interview", label: "Wawancara", perm: "interview.view" },
     { href: "/ranking", label: "Ranking", perm: "ranking.view" },
   ]},
   { section: "Keputusan", items: [

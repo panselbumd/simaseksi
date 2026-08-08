@@ -1,7 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { notFound } from "next/navigation";
 import RegisterForm from "./RegisterForm";
-import { PublicBackground } from "@/components/PublicBackground";
 
 export default async function DaftarSelectionPage({ params }: { params: { selectionId: string } }) {
   const supabase = createClient();
@@ -14,8 +13,7 @@ export default async function DaftarSelectionPage({ params }: { params: { select
   if (!selection) notFound();
 
   return (
-    <PublicBackground>
-    <div className="min-h-screen p-6">
+    <div className="min-h-screen bg-gradient-to-br from-navy-950 via-navy-900 to-navy-800 p-6">
       <div className="max-w-xl mx-auto pt-10 pb-16">
         <div className="flex items-center gap-3 mb-8">
           <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-gold-400 to-gold-700 flex items-center justify-center font-display font-extrabold text-navy-950">S</div>
@@ -40,6 +38,5 @@ export default async function DaftarSelectionPage({ params }: { params: { select
         </div>
       </div>
     </div>
-    </PublicBackground>
   );
 }

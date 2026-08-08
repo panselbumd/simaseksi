@@ -1,9 +1,6 @@
-import { PublicBackground } from "@/components/PublicBackground";
-
 export default function DaftarBerhasilPage() {
   return (
-    <PublicBackground>
-    <div className="min-h-screen flex items-center justify-center p-6">
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-navy-950 via-navy-900 to-navy-800 p-6">
       <div className="w-full max-w-md bg-white rounded-2xl shadow-2xl p-10 text-center">
         <div className="w-14 h-14 rounded-full bg-green-50 text-green-600 flex items-center justify-center mx-auto mb-4 text-2xl">✓</div>
         <h1 className="text-xl font-display font-bold text-navy-900 mb-2">Pendaftaran Berhasil</h1>
@@ -16,6 +13,5 @@ export default function DaftarBerhasilPage() {
         </a>
       </div>
     </div>
-    </PublicBackground>
   );
 }

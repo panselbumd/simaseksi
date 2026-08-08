@@ -3,7 +3,6 @@
 import { useFormState, useFormStatus } from "react-dom";
 import { useMemo, useState } from "react";
 import { loginAction, type LoginState } from "./actions";
-import { PublicBackground } from "@/components/PublicBackground";
 
 function SubmitButton() {
   const { pending } = useFormStatus();
@@ -24,8 +23,7 @@ export default function LoginPage() {
   const { a, b } = useMemo(() => ({ a: Math.ceil(Math.random() * 9), b: Math.ceil(Math.random() * 9) }), []);
 
   return (
-    <PublicBackground>
-    <div className="min-h-screen flex items-center justify-center p-6">
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-navy-950 via-navy-900 to-navy-800 p-6">
       <div className="w-full max-w-md bg-white rounded-2xl shadow-2xl p-10">
         <div className="flex items-center gap-3 mb-8">
           <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-gold-400 to-gold-700 flex items-center justify-center font-display font-extrabold text-navy-950">S</div>
@@ -96,6 +94,5 @@ export default function LoginPage() {
         </div>
       </div>
     </div>
-    </PublicBackground>
   );
 }
