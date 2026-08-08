@@ -35,6 +35,13 @@ export default function LoginPage() {
         <h1 className="text-xl font-display font-bold text-navy-900 mb-1">Masuk ke SIMASEKSI</h1>
         <p className="text-sm text-ink-500 mb-6">Gunakan username dan password yang telah terdaftar.</p>
 
+        <a
+          href="/daftar"
+          className="block mb-6 text-center text-xs font-semibold text-navy-700 border border-navy-100 bg-navy-50 rounded-md px-3 py-2 hover:bg-navy-100"
+        >
+          Belum punya akun? Daftar sebagai Peserta Seleksi &rarr;
+        </a>
+
         <form
           action={(formData) => {
             const answer = parseInt(captchaAnswer, 10);
@@ -77,8 +84,9 @@ export default function LoginPage() {
           <table className="w-full">
             <tbody>
               <tr><td className="font-semibold text-gold-700 pr-2">Admin</td><td className="font-mono">admin</td><td className="font-mono">admin123</td></tr>
-              <tr><td className="font-semibold text-gold-700 pr-2">Panitia</td><td className="font-mono">pansel</td><td className="font-mono">pansel123</td></tr>
-              <tr><td className="font-semibold text-gold-700 pr-2">Tim UKK</td><td className="font-mono">ukk01</td><td className="font-mono">ukk123</td></tr>
+              <tr><td className="font-semibold text-gold-700 pr-2">Pansel (Ketua)</td><td className="font-mono">pansel_ketua</td><td className="font-mono">pansel123</td></tr>
+              <tr><td className="font-semibold text-gold-700 pr-2">Pansel (Anggota)</td><td className="font-mono">pansel_anggota</td><td className="font-mono">pansel123</td></tr>
+              <tr><td className="font-semibold text-gold-700 pr-2">Tim UKK</td><td className="font-mono">ukk01 s/d ukk05</td><td className="font-mono">ukk123</td></tr>
               <tr><td className="font-semibold text-gold-700 pr-2">Peserta</td><td className="font-mono">peserta01</td><td className="font-mono">peserta123</td></tr>
               <tr><td className="font-semibold text-gold-700 pr-2">KPM</td><td className="font-mono">kpm</td><td className="font-mono">kpm123</td></tr>
             </tbody>

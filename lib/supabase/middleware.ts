@@ -39,7 +39,11 @@ export async function updateSession(request: NextRequest) {
   const isAppRoute = path.startsWith("/dashboard") || path.startsWith("/bumd") ||
     path.startsWith("/selections") || path.startsWith("/candidates") ||
     path.startsWith("/assessment") || path.startsWith("/ranking") ||
-    path.startsWith("/audit-log") || path.startsWith("/users") || path.startsWith("/announcement");
+    path.startsWith("/audit-log") || path.startsWith("/users") || path.startsWith("/announcement") ||
+    path.startsWith("/regulation") || path.startsWith("/recommendation") || path.startsWith("/decision");
+  // NOTE: "/daftar" (pendaftaran peserta publik) and "/login" are
+  // intentionally left OUT of this list — they must stay reachable by
+  // anonymous visitors.
 
   if (isAppRoute && !user) {
     const url = request.nextUrl.clone();

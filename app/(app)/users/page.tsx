@@ -1,15 +1,34 @@
+import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { createUserAction, toggleUserActiveAction } from "./actions";
 import { ROLE_LABEL, type AppRole } from "@/lib/rbac";
+import DeleteUserButton from "./DeleteUserButton";
+
+const EXPECTED: Record<string, number> = { SYSTEM_ADMIN: 1, PANITIA_SELEKSI: 2, TIM_UKK: 5 };
 
 export default async function UsersPage() {
   const supabase = createClient();
   const { data: users } = await supabase.from("profiles").select("*").order("created_at");
 
+  const counts: Record<string, number> = {};
+  for (const u of users ?? []) counts[u.role] = (counts[u.role] ?? 0) + 1;
+
   return (
     <div>
       <h1 className="text-2xl font-display font-bold text-navy-900 mb-1">Manajemen User</h1>
-      <p className="text-sm text-ink-500 mb-6">Administrator hanya mengelola akses teknis — tidak memiliki kewenangan substantif atas nilai atau keputusan seleksi.</p>
+      <p className="text-sm text-ink-500 mb-4">Administrator hanya mengelola akses teknis — tidak memiliki kewenangan substantif atas nilai atau keputusan seleksi.</p>
+
+      <div className="flex flex-wrap gap-2 mb-6">
+        {Object.entries(EXPECTED).map(([role, expected]) => {
+          const actual = counts[role] ?? 0;
+          const ok = actual === expected;
+          return (
+            <span key={role} className={`text-[11px] font-semibold px-2.5 py-1 rounded-full ${ok ? "bg-green-50 text-green-700" : "bg-amber-50 text-amber-700"}`}>
+              {ROLE_LABEL[role as AppRole]}: {actual}/{expected} {ok ? "✓" : "⚠"}
+            </span>
+          );
+        })}
+      </div>
 
       <form action={createUserAction} className="bg-white border border-gray-200 rounded-md p-5 mb-6 grid grid-cols-5 gap-3 items-end">
         <div><label className="block text-xs font-semibold mb-1">Nama</label><input name="name" required className="w-full border border-gray-200 rounded-md px-2.5 py-1.5 text-sm" /></div>
@@ -40,9 +59,13 @@ export default async function UsersPage() {
                   <span className={`text-[11px] px-2 py-0.5 rounded-full font-semibold ${u.active ? "bg-green-50 text-green-700" : "bg-red-50 text-red-700"}`}>{u.active ? "Aktif" : "Nonaktif"}</span>
                 </td>
                 <td className="px-4 py-3">
-                  <form action={toggleUserActiveAction.bind(null, u.id, !u.active)}>
-                    <button className="text-xs text-navy-700 underline">{u.active ? "Nonaktifkan" : "Aktifkan"}</button>
-                  </form>
+                  <div className="flex items-center gap-3">
+                    <Link href={`/users/${u.id}/edit`} className="text-xs text-navy-700 underline">Edit</Link>
+                    <form action={toggleUserActiveAction.bind(null, u.id, !u.active)}>
+                      <button className="text-xs text-navy-700 underline">{u.active ? "Nonaktifkan" : "Aktifkan"}</button>
+                    </form>
+                    <DeleteUserButton userId={u.id} username={u.username} />
+                  </div>
                 </td>
               </tr>
             ))}

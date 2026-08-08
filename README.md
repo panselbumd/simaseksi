@@ -60,7 +60,14 @@ Dashboard → **SQL Editor** → paste and run, in order:
 1. `supabase/schema.sql` — enums, tables, indexes, RLS policies, the
    `write_audit_log()` / `prevent_locked_score_update()` functions, the
    append-only audit trigger, the auto-ranking view `v_candidate_ranking`,
-   and the two Storage buckets (`kop-surat`, `candidate-documents`).
+   and the two Storage buckets (`kop-surat`, `candidate-documents`). This
+   file already includes the account-roster rules below (single-admin
+   unique index, Pansel `posisi`, registration-window-gated applicant
+   inserts) — skip step 1b for a brand-new project.
+1b. **Existing project only** (schema.sql already applied before this
+   update): also run `supabase/migration_0001_akun_dan_pendaftaran.sql`.
+   It is idempotent (`if not exists` / `drop policy if exists`), safe to
+   run again.
 2. `supabase/seed.sql` — demo BUMD, regulations, SOP, one selection, and its
    assessment components. (Tables that reference `auth.users` — profiles,
    applicants, candidates, scores — are seeded separately in step 3.4,
@@ -100,11 +107,15 @@ rather not deal with a fake TLD, swap `get_login_email` for a real
 npx dotenv -e .env.local -- npx tsx scripts/seed-auth-users.ts
 ```
 
-This creates the 7 demo accounts (`admin`, `pansel`, `ukk01`, `ukk02`,
-`peserta01`, `kpm`, `auditor` — same passwords as the prototype's login
-screen), assigns `pansel`/`ukk01`/`ukk02`/`kpm` to the demo selection via
-`selection_members`, and inserts one sample applicant → candidate with
-locked UKK scores so Ranking has something to show immediately.
+This creates the 11 demo accounts required by the account roster spec —
+**Admin = 1** (`admin`), **Pansel = 2** (`pansel_ketua`, `pansel_anggota` —
+Ketua/Anggota is recorded on `selection_members.posisi`), **Tim UKK = 5**
+(`ukk01` … `ukk05`), plus `peserta01`, `kpm`, and `auditor` (same passwords
+as the prototype's login screen). It assigns Pansel/Tim UKK/KPM to the demo
+selection via `selection_members`, and inserts one sample applicant →
+candidate with locked UKK scores so Ranking has something to show
+immediately. The `/users` screen shows a live 1/2/5 roster-compliance badge
+per role.
 
 Then upload the two letterhead images (already embedded as base64 in
 `index.html`) to the public `kop-surat` Storage bucket you created in 3.2:
@@ -127,6 +138,21 @@ only a UI convenience for building the sidebar). Highlights, all defined in
 | Only KPM/Pejabat Berwenang decide | `decisions_insert_kpm` is the only INSERT policy on `decisions`. |
 | Audit trail is append-only | `audit_logs` has a SELECT policy (admin/auditor) and zero UPDATE/DELETE policies; the only INSERT path is the `write_audit_log()` function. |
 | Peserta sees only their own data | `applicants`/`candidates`/`documents` SELECT policies include `user_id = auth.uid()`. |
+| Admin = exactly 1 account | `uq_single_system_admin` — a partial unique index on `profiles` filtered to `role = 'SYSTEM_ADMIN'` — makes a second admin row impossible, not just a UI-side check. |
+| Peserta can only register while registration is open | `applicants_insert_self` requires the target `selections.status = 'REGISTRATION'` in the same query, in Postgres — not just a hidden/disabled UI button. |
+
+### 3.6 Public applicant self-registration (`/daftar`)
+
+`/daftar` and `/daftar/[selectionId]` are **outside** the `(app)` route
+group and intentionally excluded from `middleware.ts`'s `isAppRoute` list,
+so they stay reachable by anonymous visitors. They list every selection
+with `status = 'REGISTRATION'` (via the existing public `selections_select_public`
+RLS policy) and let a visitor create their own `PESERTA` account + submit
+their `applicants` row in one step (`app/daftar/[selectionId]/actions.ts`).
+Because this endpoint is unauthenticated, the role is hard-coded to
+`PESERTA` server-side — nothing from the form can request a different role.
+The username/password they choose becomes their normal SIMASEKSI login
+(`username@simaseksi.local` under the hood, same as every other account).
 
 ---
 
@@ -160,8 +186,13 @@ That completes the full chain:
 
 **Fully wired end-to-end** (schema + RLS + server actions + UI): Auth/RBAC,
 BUMD, Selections, Candidates, Assessment & Scoring (with independent
-per-UKK-member locking), auto-computed Ranking, Audit Trail, User Management,
-Regulation database.
+per-UKK-member locking), auto-computed Ranking, Audit Trail, Regulation
+database, and:
+- **User Management** — create, **edit** (`/users/[id]/edit`), **delete**
+  (permanent, via `deleteUserAction`), and deactivate/reactivate, all admin-
+  only and audit-logged. A self-account-lock-out guard prevents an admin
+  from deleting/deactivating/demoting their own currently-logged-in account.
+- **Public applicant self-registration** (`/daftar`) — see §3.6.
 
 **Schema + RLS ready, UI scaffolded with the exact pattern to follow**:
 Recommendation, Decision, Announcement — each placeholder page names the

@@ -24,11 +24,18 @@ if (!url || !serviceKey) {
 }
 const admin = createClient(url, serviceKey, { auth: { autoRefreshToken: false, persistSession: false } });
 
+// Roster per spesifikasi:
+//   Admin = 1, Pansel = 2 (Ketua & Anggota), Tim UKK = 5 (ukk01 s/d ukk05).
+// `posisi` hanya dipakai untuk PANITIA_SELEKSI saat assign ke selection_members.
 const DEMO_USERS = [
   { username: "admin", password: "admin123", name: "Rahmat Hidayat", role: "SYSTEM_ADMIN", unit: "Bagian Perekonomian dan SDA" },
-  { username: "pansel", password: "pansel123", name: "Dra. Herlina Wijayanti, M.Si.", role: "PANITIA_SELEKSI", unit: "Sekretariat Panitia Seleksi" },
+  { username: "pansel_ketua", password: "pansel123", name: "Dra. Herlina Wijayanti, M.Si.", role: "PANITIA_SELEKSI", unit: "Sekretariat Panitia Seleksi", posisi: "KETUA" },
+  { username: "pansel_anggota", password: "pansel123", name: "Drs. Bambang Sutrisno, M.Si.", role: "PANITIA_SELEKSI", unit: "Sekretariat Panitia Seleksi", posisi: "ANGGOTA" },
   { username: "ukk01", password: "ukk123", name: "Dr. Bagas Setiawan, M.M.", role: "TIM_UKK", unit: "Tim UKK - Unsur Akademisi" },
   { username: "ukk02", password: "ukk123", name: "Ir. Wulan Kartika, M.T.", role: "TIM_UKK", unit: "Tim UKK - Unsur Profesional" },
+  { username: "ukk03", password: "ukk123", name: "Drs. Eko Prabowo, M.M.", role: "TIM_UKK", unit: "Tim UKK - Unsur Pemerintah Daerah" },
+  { username: "ukk04", password: "ukk123", name: "Sri Mulyani Handayani, S.E., M.M.", role: "TIM_UKK", unit: "Tim UKK - Unsur Profesional" },
+  { username: "ukk05", password: "ukk123", name: "Ir. Hendra Kusuma, M.T.", role: "TIM_UKK", unit: "Tim UKK - Unsur Akademisi" },
   { username: "peserta01", password: "peserta123", name: "Ahmad Prasetyo Wibowo", role: "PESERTA", unit: "-" },
   { username: "kpm", password: "kpm123", name: "H. Suryo Aditomo, S.H., M.H.", role: "KPM", unit: "KPM Kota Batu" },
   { username: "auditor", password: "auditor123", name: "Ganjar Wicaksono", role: "AUDITOR", unit: "Inspektorat Kota Batu" },
@@ -58,9 +65,13 @@ async function main() {
 
   // Assign panitia + tim UKK to the demo Direksi selection
   await admin.from("selection_members").upsert([
-    { selection_id: SELECTION_ID, user_id: ids["pansel"], member_role: "PANITIA_SELEKSI" },
+    { selection_id: SELECTION_ID, user_id: ids["pansel_ketua"], member_role: "PANITIA_SELEKSI", posisi: "KETUA" },
+    { selection_id: SELECTION_ID, user_id: ids["pansel_anggota"], member_role: "PANITIA_SELEKSI", posisi: "ANGGOTA" },
     { selection_id: SELECTION_ID, user_id: ids["ukk01"], member_role: "TIM_UKK" },
     { selection_id: SELECTION_ID, user_id: ids["ukk02"], member_role: "TIM_UKK" },
+    { selection_id: SELECTION_ID, user_id: ids["ukk03"], member_role: "TIM_UKK" },
+    { selection_id: SELECTION_ID, user_id: ids["ukk04"], member_role: "TIM_UKK" },
+    { selection_id: SELECTION_ID, user_id: ids["ukk05"], member_role: "TIM_UKK" },
     { selection_id: SELECTION_ID, user_id: ids["kpm"], member_role: "KPM" },
   ], { onConflict: "selection_id,user_id,member_role" });
 

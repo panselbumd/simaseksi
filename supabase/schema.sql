@@ -78,6 +78,14 @@ create policy "profiles_admin_manage"
   using (public.is_admin())
   with check (public.is_admin());
 
+-- Structural enforcement of "hanya 1 Administrator Sistem": a partial unique
+-- index on a constant expression, filtered to SYSTEM_ADMIN rows, means
+-- Postgres itself rejects a second SYSTEM_ADMIN row account-wide (not just a
+-- UI check in users/actions.ts).
+create unique index if not exists uq_single_system_admin
+  on public.profiles ((true))
+  where role = 'SYSTEM_ADMIN';
+
 -- Username -> synthetic email lookup for the login form (pre-auth, so it must
 -- be SECURITY DEFINER and expose nothing except the email of an active user).
 create or replace function public.get_login_email(p_username text)
@@ -171,6 +179,10 @@ create table public.selection_members (
   selection_id  uuid not null references public.selections(id) on delete cascade,
   user_id       uuid not null references public.profiles(id) on delete cascade,
   member_role   app_role not null,             -- PANITIA_SELEKSI | TIM_UKK | KPM
+  -- Only meaningful when member_role = 'PANITIA_SELEKSI': distinguishes
+  -- Ketua Panitia Seleksi from Anggota Panitia Seleksi (spec: Pansel = 2
+  -- akun, satu Ketua dan satu Anggota).
+  posisi        text check (posisi in ('KETUA','ANGGOTA')),
   unique (selection_id, user_id, member_role)
 );
 
@@ -278,7 +290,17 @@ create policy "applicants_select_staff"
   );
 create policy "applicants_insert_self"
   on public.applicants for insert
-  with check (user_id = auth.uid() and public.current_role() = 'PESERTA');
+  with check (
+    user_id = auth.uid()
+    and public.current_role() = 'PESERTA'
+    -- Structural enforcement of "Peserta dapat mendaftar saat tahapan
+    -- pendaftaran seleksi resmi dibuka": an insert is only legal while the
+    -- target selection is in the REGISTRATION stage, in Postgres itself.
+    and exists (
+      select 1 from public.selections s
+      where s.id = selection_id and s.status = 'REGISTRATION'
+    )
+  );
 create policy "applicants_update_self_draft"
   on public.applicants for update
   using (user_id = auth.uid() and status = 'VERIFICATION')
