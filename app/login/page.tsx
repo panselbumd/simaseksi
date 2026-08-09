@@ -78,20 +78,6 @@ export default function LoginPage() {
           )}
           <SubmitButton />
         </form>
-
-        <div className="mt-6 bg-gold-100 border border-dashed border-gold-500 rounded-lg p-3 text-[11px]">
-          <b className="block mb-1">DEMO ONLY — Kredensial Contoh</b>
-          <table className="w-full">
-            <tbody>
-              <tr><td className="font-semibold text-gold-700 pr-2">Admin</td><td className="font-mono">admin</td><td className="font-mono">admin123</td></tr>
-              <tr><td className="font-semibold text-gold-700 pr-2">Pansel (Ketua)</td><td className="font-mono">pansel_ketua</td><td className="font-mono">pansel123</td></tr>
-              <tr><td className="font-semibold text-gold-700 pr-2">Pansel (Anggota)</td><td className="font-mono">pansel_anggota</td><td className="font-mono">pansel123</td></tr>
-              <tr><td className="font-semibold text-gold-700 pr-2">Tim UKK</td><td className="font-mono">ukk01 s/d ukk05</td><td className="font-mono">ukk123</td></tr>
-              <tr><td className="font-semibold text-gold-700 pr-2">Peserta</td><td className="font-mono">peserta01</td><td className="font-mono">peserta123</td></tr>
-              <tr><td className="font-semibold text-gold-700 pr-2">KPM</td><td className="font-mono">kpm</td><td className="font-mono">kpm123</td></tr>
-            </tbody>
-          </table>
-        </div>
       </div>
     </div>
   );
