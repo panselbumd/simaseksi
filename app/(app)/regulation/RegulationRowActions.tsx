@@ -1,6 +1,6 @@
 "use client";
 
-import { deleteRegulationAction, verifyRegulationAction } from "./regulation-actions";
+import { deleteRegulationAction, verifyRegulationAction } from "./actions";
 
 export default function RegulationRowActions({ id, judul, status }: { id: string; judul: string; status: string }) {
   return (
