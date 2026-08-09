@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { createUserAction, toggleUserActiveAction } from "./actions";
-import { ROLE_LABEL, type AppRole } from "@/lib/rbac";
+import { ROLE_LABEL, CREATABLE_ROLES, type AppRole } from "@/lib/rbac";
 import DeleteUserButton from "./DeleteUserButton";
 
 const EXPECTED: Record<string, number> = { SYSTEM_ADMIN: 1, PANITIA_SELEKSI: 2, TIM_UKK: 5 };
@@ -35,8 +35,9 @@ export default async function UsersPage() {
         <div><label className="block text-xs font-semibold mb-1">Username</label><input name="username" required className="w-full border border-gray-200 rounded-md px-2.5 py-1.5 text-sm" /></div>
         <div><label className="block text-xs font-semibold mb-1">Peran</label>
           <select name="role" className="w-full border border-gray-200 rounded-md px-2.5 py-1.5 text-sm">
-            {Object.keys(ROLE_LABEL).map((r) => <option key={r} value={r}>{ROLE_LABEL[r as AppRole]}</option>)}
+            {CREATABLE_ROLES.map((r) => <option key={r} value={r}>{ROLE_LABEL[r]}</option>)}
           </select>
+          <p className="text-[11px] text-ink-500 mt-1">Akun Peserta tidak dibuat di sini — peserta mendaftar mandiri lewat /daftar saat seleksi dibuka.</p>
         </div>
         <div><label className="block text-xs font-semibold mb-1">Unit Kerja</label><input name="unit" className="w-full border border-gray-200 rounded-md px-2.5 py-1.5 text-sm" /></div>
         <button type="submit" className="bg-navy-900 text-white text-sm font-semibold rounded-md px-4 py-2">Tambah User</button>
