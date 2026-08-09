@@ -1,5 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import RegulationRowActions from "./RegulationRowActions";
+import { createRegulationAction } from "./regulation-actions";
+import { hasPermission, type AppRole } from "@/lib/rbac";
 
 const STATUS_STYLE: Record<string, string> = {
   VERIFIED: "bg-green-50 text-green-700",
@@ -13,7 +15,9 @@ export default async function RegulationPage() {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   const { data: profile } = await supabase.from("profiles").select("role").eq("id", user!.id).single();
-  const isAdmin = profile?.role === "SYSTEM_ADMIN";
+  const role = profile?.role as AppRole;
+  // Admin AND Panitia Seleksi may manage regulasi (lib/rbac.ts: "regulation.manage").
+  const canManage = hasPermission(role, "regulation.manage");
 
   const { data: regs } = await supabase.from("regulations").select("*").order("tahun", { ascending: false });
 
@@ -24,11 +28,24 @@ export default async function RegulationPage() {
       <div className="bg-amber-50 border border-amber-200 text-amber-800 text-xs rounded-md px-4 py-3 mb-5">
         Sistem tidak mengarang isi regulasi. Item berstatus &quot;Perlu Validasi&quot; wajib diperiksa pihak berwenang sebelum ditandai Terverifikasi.
       </div>
+
+      {canManage && (
+        <form action={createRegulationAction} className="bg-white border border-gray-200 rounded-md p-5 mb-6 grid grid-cols-5 gap-3 items-end">
+          <div><label className="block text-xs font-semibold mb-1">Kategori</label><input name="kategori" required placeholder="UU, PP, Permendagri, ..." className="w-full border border-gray-200 rounded-md px-2.5 py-1.5 text-sm" /></div>
+          <div className="col-span-2"><label className="block text-xs font-semibold mb-1">Judul</label><input name="judul" required className="w-full border border-gray-200 rounded-md px-2.5 py-1.5 text-sm" /></div>
+          <div><label className="block text-xs font-semibold mb-1">Nomor</label><input name="nomor" className="w-full border border-gray-200 rounded-md px-2.5 py-1.5 text-sm" /></div>
+          <div><label className="block text-xs font-semibold mb-1">Tahun</label><input name="tahun" type="number" className="w-full border border-gray-200 rounded-md px-2.5 py-1.5 text-sm" /></div>
+          <div className="col-span-5">
+            <button type="submit" className="bg-navy-900 text-white text-sm font-semibold rounded-md px-4 py-2">Tambah Regulasi</button>
+          </div>
+        </form>
+      )}
+
       <div className="bg-white border border-gray-200 rounded-md overflow-hidden">
         <table className="w-full text-sm">
           <thead><tr className="bg-navy-50 text-left text-[11px] uppercase text-ink-700">
             <th className="px-4 py-3">Kategori</th><th className="px-4 py-3">Judul</th><th className="px-4 py-3">Nomor/Tahun</th><th className="px-4 py-3">Status</th>
-            {isAdmin && <th className="px-4 py-3"></th>}
+            {canManage && <th className="px-4 py-3"></th>}
           </tr></thead>
           <tbody>
             {regs?.map((r) => (
@@ -42,7 +59,7 @@ export default async function RegulationPage() {
                   </span>
                   {r.catatan && <div className="text-[10px] text-amber-700 mt-0.5">{r.catatan}</div>}
                 </td>
-                {isAdmin && (
+                {canManage && (
                   <td className="px-4 py-3">
                     <RegulationRowActions id={r.id} judul={r.judul} status={r.status} />
                   </td>

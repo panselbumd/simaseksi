@@ -11,35 +11,24 @@ export const ROLE_LABEL: Record<AppRole, string> = {
   AUDITOR: "Auditor",
 };
 
-// Peran yang boleh dibuat manual oleh Admin lewat /users. PESERTA sengaja
-// dikecualikan: akun peserta hanya dibuat lewat pendaftaran mandiri di
-// /daftar ketika sebuah seleksi berstatus REGISTRATION (lihat §3.6 README
-// dan applicants_insert_self di schema.sql). Admin masih bisa MELIHAT/
-// MENGEDIT akun peserta yang sudah ada (mis. menonaktifkan), makanya
-// PESERTA tetap ada di ROLE_LABEL dan di halaman Edit — hanya disembunyikan
-// dari form "Tambah User".
-export const CREATABLE_ROLES: AppRole[] = (Object.keys(ROLE_LABEL) as AppRole[]).filter(
-  (r) => r !== "PESERTA",
-);
-
 // Mirrors index.html's PERMISSIONS matrix 1:1 so both surfaces stay in sync.
 // This is a UI/UX convenience layer only — the real authorization boundary
 // is Postgres Row Level Security (see supabase/schema.sql). Never rely on
 // this map alone to protect data.
 export const PERMISSIONS: Record<AppRole, string[]> = {
+  // Admin's ONLY write permissions are user.manage (accounts) and
+  // regulation.manage (regulasi may also be added by Panitia — see
+  // PANITIA_SELEKSI below). Every other module is view-only for Admin,
+  // per the "Admin = System Control, not System Authority" rule: Admin
+  // helps other accounts with access problems but never touches
+  // selection/candidate/assessment/recommendation/decision data.
   SYSTEM_ADMIN: [
-    "dashboard.view", "bumd.view", "bumd.manage", "regulation.view", "regulation.manage",
-    "sop.view", "sop.manage", "selection.view", "candidate.view", "document.view",
-    "audit.view", "user.manage", "settings.view",
-    // Announcements are public-relations content, not a substantive selection
-    // decision, so Admin shares this write with Panitia per the DB policy
-    // `announcements_manage_panitia` (role in PANITIA_SELEKSI, SYSTEM_ADMIN).
-    // Admin deliberately still has NO recommendation/decision/ranking-write
-    // access — see the "Admin = System Control" banner on /dashboard.
-    "announcement.view", "announcement.manage",
+    "dashboard.view", "bumd.view", "regulation.view", "regulation.manage",
+    "sop.view", "selection.view", "candidate.view", "document.view",
+    "audit.view", "user.manage", "settings.view", "announcement.view",
   ],
   PANITIA_SELEKSI: [
-    "dashboard.view", "bumd.view", "regulation.view", "sop.view", "selection.view", "selection.manage",
+    "dashboard.view", "bumd.view", "regulation.view", "regulation.manage", "sop.view", "selection.view", "selection.manage",
     "schedule.view", "schedule.manage", "applicant.view", "applicant.manage", "nomination.view",
     "nomination.manage", "eligibility.view", "eligibility.manage", "candidate.view", "candidate.manage",
     "document.view", "document.verify", "ukk.view", "ukk.manage", "assessment.view", "ranking.view",

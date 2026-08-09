@@ -1,10 +1,15 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { createUserAction, toggleUserActiveAction } from "./actions";
-import { ROLE_LABEL, CREATABLE_ROLES, type AppRole } from "@/lib/rbac";
+import { ROLE_LABEL, type AppRole } from "@/lib/rbac";
 import DeleteUserButton from "./DeleteUserButton";
 
 const EXPECTED: Record<string, number> = { SYSTEM_ADMIN: 1, PANITIA_SELEKSI: 2, TIM_UKK: 5 };
+
+// Admin only creates accounts for Panitia Seleksi and Tim UKK. Peserta
+// accounts are self-registered via /daftar (nama lengkap, username, email,
+// nomor telepon); Admin has no path to create a PESERTA account here.
+const CREATABLE_ROLES: AppRole[] = ["PANITIA_SELEKSI", "TIM_UKK"];
 
 export default async function UsersPage() {
   const supabase = await createClient();
@@ -16,7 +21,7 @@ export default async function UsersPage() {
   return (
     <div>
       <h1 className="text-2xl font-display font-bold text-navy-900 mb-1">Manajemen User</h1>
-      <p className="text-sm text-ink-500 mb-4">Administrator hanya mengelola akses teknis — tidak memiliki kewenangan substantif atas nilai atau keputusan seleksi.</p>
+      <p className="text-sm text-ink-500 mb-4">Administrator hanya mengelola akses teknis — tidak memiliki kewenangan substantif atas nilai atau keputusan seleksi. Administrator hanya dapat membuat akun Panitia Seleksi dan Tim UKK; akun Peserta dibuat sendiri oleh peserta melalui pendaftaran seleksi di halaman publik.</p>
 
       <div className="flex flex-wrap gap-2 mb-6">
         {Object.entries(EXPECTED).map(([role, expected]) => {
@@ -37,7 +42,6 @@ export default async function UsersPage() {
           <select name="role" className="w-full border border-gray-200 rounded-md px-2.5 py-1.5 text-sm">
             {CREATABLE_ROLES.map((r) => <option key={r} value={r}>{ROLE_LABEL[r]}</option>)}
           </select>
-          <p className="text-[11px] text-ink-500 mt-1">Akun Peserta tidak dibuat di sini — peserta mendaftar mandiri lewat /daftar saat seleksi dibuka.</p>
         </div>
         <div><label className="block text-xs font-semibold mb-1">Unit Kerja</label><input name="unit" className="w-full border border-gray-200 rounded-md px-2.5 py-1.5 text-sm" /></div>
         <button type="submit" className="bg-navy-900 text-white text-sm font-semibold rounded-md px-4 py-2">Tambah User</button>

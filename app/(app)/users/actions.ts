@@ -28,8 +28,12 @@ export async function createUserAction(formData: FormData) {
   const unit = String(formData.get("unit") || "");
   const password = String(formData.get("password") || "password123");
   if (!username || !name || !role) throw new Error("Nama, username, dan peran wajib diisi.");
-  if (role === "PESERTA") {
-    throw new Error("Akun Peserta tidak dibuat di sini — peserta mendaftar mandiri lewat /daftar saat seleksi berstatus REGISTRATION.");
+
+  // Admin only creates Panitia Seleksi / Tim UKK accounts. Peserta accounts
+  // are self-registered (see /daftar), never created by Admin — enforced
+  // here even though the UI dropdown already only offers these two roles.
+  if (role !== "PANITIA_SELEKSI" && role !== "TIM_UKK") {
+    throw new Error("Administrator Sistem hanya dapat membuat akun Panitia Seleksi atau Tim UKK. Akun Peserta dibuat sendiri oleh peserta melalui pendaftaran seleksi.");
   }
 
   // Structural rule "Admin = 1 akun" is enforced by a Postgres unique index

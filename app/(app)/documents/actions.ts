@@ -2,6 +2,8 @@
 
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
+import { sendStageProgressionEmail } from "@/lib/email";
+import { REQUIRED_DOCUMENTS } from "./constants";
 
 // Peserta: unggah/perbarui satu jenis dokumen miliknya sendiri, untuk
 // applicant record miliknya pada seleksi tersebut. RLS
@@ -52,6 +54,8 @@ export async function verifyDocumentAction(documentId: string, status: string, f
   if (!user) throw new Error("Not authenticated");
   const catatan = String(formData.get("catatan") || "").trim();
 
+  const { data: doc } = await supabase.from("documents").select("owner_id, selection_id").eq("id", documentId).single();
+
   const { error } = await supabase.from("documents")
     .update({ status, verifier: user.id, catatan: catatan || null, tanggal: new Date().toISOString().slice(0, 10) })
     .eq("id", documentId);
@@ -60,6 +64,35 @@ export async function verifyDocumentAction(documentId: string, status: string, f
   await supabase.rpc("write_audit_log", {
     p_module: "Document", p_action: `VERIFY_DOCUMENT_${status}`, p_old_value: "-", p_new_value: status, p_selection: "",
   });
+
+  // Peserta lolos tahap Verifikasi Dokumen begitu SEMUA dokumen wajibnya
+  // berstatus APPROVED — kirim notifikasi email sekali saat kondisi ini
+  // baru saja terpenuhi. (Ini satu-satunya titik "lolos tahapan" yang
+  // sudah ada implementasinya di codebase; tahap UKK/Wawancara/Keputusan
+  // belum punya aksi "tandai lolos" eksplisit — lihat catatan di
+  // lib/email.ts / dokumentasi go-live untuk pola yang sama.)
+  if (status === "APPROVED" && doc) {
+    const { data: allDocs } = await supabase
+      .from("documents").select("jenis, status")
+      .eq("owner_type", "APPLICANT").eq("owner_id", doc.owner_id).eq("selection_id", doc.selection_id);
+    const approvedJenis = new Set((allDocs ?? []).filter((d) => d.status === "APPROVED").map((d) => d.jenis));
+    const allRequiredApproved = REQUIRED_DOCUMENTS.every((j) => approvedJenis.has(j));
+
+    if (allRequiredApproved) {
+      const { data: applicant } = await supabase
+        .from("applicants").select("nama, email, selections(nama)")
+        .eq("id", doc.owner_id).single();
+      if (applicant) {
+        await sendStageProgressionEmail({
+          to: applicant.email,
+          nama: applicant.nama,
+          selectionNama: (applicant as any).selections?.nama ?? "",
+          stage: "VERIFICATION_PASSED",
+        });
+      }
+    }
+  }
+
   revalidatePath("/documents");
 }
 
