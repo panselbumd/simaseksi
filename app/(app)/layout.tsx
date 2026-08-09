@@ -24,6 +24,10 @@ const NAV: { section: string; items: { href: string; label: string; perm: string
     { href: "/decision", label: "Keputusan", perm: "decision.view" },
     { href: "/announcement", label: "Pengumuman", perm: "announcement.view" },
   ]},
+  { section: "Dokumen & Laporan", items: [
+    { href: "/letters", label: "Generator Surat", perm: "letter.view" },
+    { href: "/reports", label: "Laporan", perm: "report.view" },
+  ]},
   { section: "Administrasi", items: [
     { href: "/users", label: "Manajemen User", perm: "user.manage" },
     { href: "/audit-log", label: "Audit Trail", perm: "audit.view" },
