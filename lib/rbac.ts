@@ -11,6 +11,17 @@ export const ROLE_LABEL: Record<AppRole, string> = {
   AUDITOR: "Auditor",
 };
 
+// Peran yang boleh dibuat manual oleh Admin lewat /users. PESERTA sengaja
+// dikecualikan: akun peserta hanya dibuat lewat pendaftaran mandiri di
+// /daftar ketika sebuah seleksi berstatus REGISTRATION (lihat §3.6 README
+// dan applicants_insert_self di schema.sql). Admin masih bisa MELIHAT/
+// MENGEDIT akun peserta yang sudah ada (mis. menonaktifkan), makanya
+// PESERTA tetap ada di ROLE_LABEL dan di halaman Edit — hanya disembunyikan
+// dari form "Tambah User".
+export const CREATABLE_ROLES: AppRole[] = (Object.keys(ROLE_LABEL) as AppRole[]).filter(
+  (r) => r !== "PESERTA",
+);
+
 // Mirrors index.html's PERMISSIONS matrix 1:1 so both surfaces stay in sync.
 // This is a UI/UX convenience layer only — the real authorization boundary
 // is Postgres Row Level Security (see supabase/schema.sql). Never rely on
