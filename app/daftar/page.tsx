@@ -5,7 +5,7 @@ import { createClient } from "@/lib/supabase/server";
 // policy "selections_select_public" (status not in ('DRAFT')), jadi kolom
 // ini benar terlihat oleh pengunjung anonim.
 export default async function DaftarIndexPage() {
-  const supabase = createClient();
+  const supabase = await createClient();
   const { data: selections } = await supabase
     .from("selections")
     .select("id, nama, jabatan, tahun, status, bumds(nama)")

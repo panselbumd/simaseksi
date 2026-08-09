@@ -13,7 +13,7 @@ export async function loginAction(_prevState: LoginState, formData: FormData): P
     return { error: "Username dan password wajib diisi." };
   }
 
-  const supabase = createClient();
+  const supabase = await createClient();
 
   // Username -> synthetic email lookup (see get_login_email() in schema.sql).
   const { data: email, error: lookupError } = await supabase.rpc("get_login_email", { p_username: username });
@@ -34,7 +34,7 @@ export async function loginAction(_prevState: LoginState, formData: FormData): P
 }
 
 export async function logoutAction() {
-  const supabase = createClient();
+  const supabase = await createClient();
   await supabase.rpc("write_audit_log", {
     p_module: "Authentication", p_action: "LOGOUT", p_old_value: "-", p_new_value: "-", p_selection: "",
   });

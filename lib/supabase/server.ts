@@ -7,8 +7,8 @@ import { cookies } from "next/headers";
  * Reads/writes the auth session via Next.js cookies(). RLS is still the source of
  * truth for authorization — this client only carries the user's session forward.
  */
-export function createClient() {
-  const cookieStore = cookies();
+export async function createClient() {
+  const cookieStore = await cookies();
 
   return createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,

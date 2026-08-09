@@ -7,7 +7,7 @@ import DeleteUserButton from "./DeleteUserButton";
 const EXPECTED: Record<string, number> = { SYSTEM_ADMIN: 1, PANITIA_SELEKSI: 2, TIM_UKK: 5 };
 
 export default async function UsersPage() {
-  const supabase = createClient();
+  const supabase = await createClient();
   const { data: users } = await supabase.from("profiles").select("*").order("created_at");
 
   const counts: Record<string, number> = {};

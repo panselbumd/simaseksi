@@ -8,7 +8,7 @@ import { revalidatePath } from "next/cache";
 // (documents_insert_owner, candidate_docs_owner_write) memastikan seorang
 // peserta hanya bisa menulis dokumen miliknya sendiri.
 export async function uploadDocumentAction(selectionId: string, jenis: string, formData: FormData) {
-  const supabase = createClient();
+  const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error("Not authenticated");
 
@@ -47,7 +47,7 @@ export async function uploadDocumentAction(selectionId: string, jenis: string, f
 
 // Panitia: verifikasi satu dokumen (VALID / INVALID / REVISION_REQUIRED / APPROVED).
 export async function verifyDocumentAction(documentId: string, status: string, formData: FormData) {
-  const supabase = createClient();
+  const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error("Not authenticated");
   const catatan = String(formData.get("catatan") || "").trim();
@@ -64,7 +64,7 @@ export async function verifyDocumentAction(documentId: string, status: string, f
 }
 
 export async function getSignedDocumentUrl(path: string) {
-  const supabase = createClient();
+  const supabase = await createClient();
   const { data, error } = await supabase.storage.from("candidate-documents").createSignedUrl(path, 60 * 5);
   if (error) throw error;
   return data.signedUrl;

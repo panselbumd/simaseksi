@@ -3,9 +3,10 @@ import { updateUserAction } from "../../actions";
 import { ROLE_LABEL, type AppRole } from "@/lib/rbac";
 import { notFound } from "next/navigation";
 
-export default async function EditUserPage({ params }: { params: { id: string } }) {
-  const supabase = createClient();
-  const { data: user } = await supabase.from("profiles").select("*").eq("id", params.id).single();
+export default async function EditUserPage({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
+  const supabase = await createClient();
+  const { data: user } = await supabase.from("profiles").select("*").eq("id", id).single();
   if (!user) notFound();
 
   const boundAction = updateUserAction.bind(null, user.id);

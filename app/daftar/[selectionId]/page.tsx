@@ -2,12 +2,13 @@ import { createClient } from "@/lib/supabase/server";
 import { notFound } from "next/navigation";
 import RegisterForm from "./RegisterForm";
 
-export default async function DaftarSelectionPage({ params }: { params: { selectionId: string } }) {
-  const supabase = createClient();
+export default async function DaftarSelectionPage({ params }: { params: Promise<{ selectionId: string }> }) {
+  const { selectionId } = await params;
+  const supabase = await createClient();
   const { data: selection } = await supabase
     .from("selections")
     .select("id, nama, jabatan, tahun, status, bumds(nama)")
-    .eq("id", params.selectionId)
+    .eq("id", selectionId)
     .single();
 
   if (!selection) notFound();

@@ -13,7 +13,7 @@ import { revalidatePath } from "next/cache";
 export async function saveScoreAction(input: {
   selectionId: string; candidateId: string; componentId: string; score: number;
 }) {
-  const supabase = createClient();
+  const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error("Not authenticated");
 
@@ -35,7 +35,7 @@ export async function saveScoreAction(input: {
  * here AND by the fact that the UI disables the button until complete.
  */
 export async function submitAssessmentAction(selectionId: string, candidateId: string) {
-  const supabase = createClient();
+  const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error("Not authenticated");
 

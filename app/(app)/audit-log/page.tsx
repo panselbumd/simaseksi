@@ -1,7 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 
 export default async function AuditLogPage() {
-  const supabase = createClient();
+  const supabase = await createClient();
   const { data: logs } = await supabase
     .from("audit_logs").select("*").order("timestamp", { ascending: false }).limit(50);
 

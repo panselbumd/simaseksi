@@ -20,7 +20,7 @@ const FAQ = [
 ];
 
 export default async function PublicHome() {
-  const supabase = createClient();
+  const supabase = await createClient();
 
   const [{ data: bumds }, { data: openSelections }, { data: regulations }] = await Promise.all([
     supabase.from("bumds").select("id, nama, bidang_usaha, tahun_berdiri, status").order("nama"),

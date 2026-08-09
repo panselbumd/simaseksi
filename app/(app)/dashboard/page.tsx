@@ -13,7 +13,7 @@ function StatCard({ label, value, sub }: { label: string; value: React.ReactNode
 }
 
 export default async function DashboardPage() {
-  const supabase = createClient();
+  const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   const { data: profile } = await supabase.from("profiles").select("*").eq("id", user!.id).single();
   const role = profile!.role as AppRole;

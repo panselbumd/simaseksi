@@ -6,7 +6,7 @@ import { NextResponse } from "next/server";
 // goes through the same RLS as the ranking page (SELECT on
 // v_candidate_ranking is readable by any authenticated staff role).
 export async function GET() {
-  const supabase = createClient();
+  const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return new NextResponse("Unauthorized", { status: 401 });
 

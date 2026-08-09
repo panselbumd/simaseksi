@@ -1,7 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 
 export default async function RegulationPage() {
-  const supabase = createClient();
+  const supabase = await createClient();
   const { data: regs } = await supabase.from("regulations").select("*").order("tahun", { ascending: false });
 
   return (

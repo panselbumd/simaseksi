@@ -1,7 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 
 export default async function BumdPage() {
-  const supabase = createClient();
+  const supabase = await createClient();
   const { data: bumds } = await supabase.from("bumds").select("*").order("nama");
 
   return (

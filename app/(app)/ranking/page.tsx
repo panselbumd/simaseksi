@@ -12,7 +12,7 @@ function recommendationLabel(score: number | null) {
 }
 
 export default async function RankingPage() {
-  const supabase = createClient();
+  const supabase = await createClient();
   // Reads the auto-computed view — ranking can never be typed in by hand.
   const { data: ranking } = await supabase
     .from("v_candidate_ranking").select("*").order("ranking", { ascending: true });

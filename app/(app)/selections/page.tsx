@@ -7,7 +7,7 @@ const STATUS_LABEL: Record<string, string> = {
 };
 
 export default async function SelectionsPage() {
-  const supabase = createClient();
+  const supabase = await createClient();
   const { data: selections } = await supabase
     .from("selections")
     .select("id, nama, jabatan, tahun, selection_type, status, bumds(nama)")

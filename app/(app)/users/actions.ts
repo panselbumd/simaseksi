@@ -5,7 +5,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
 async function assertAdmin() {
-  const supabase = createClient();
+  const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error("Not authenticated");
   const { data: profile } = await supabase.from("profiles").select("role").eq("id", user.id).single();
@@ -50,7 +50,7 @@ export async function createUserAction(formData: FormData) {
     throw profileErr;
   }
 
-  await createClient().rpc("write_audit_log", {
+  await (await createClient()).rpc("write_audit_log", {
     p_module: "User", p_action: "CREATE_USER", p_old_value: "-", p_new_value: username, p_selection: "",
   });
   revalidatePath("/users");
@@ -86,7 +86,7 @@ export async function updateUserAction(userId: string, formData: FormData) {
     if (pwErr) throw pwErr;
   }
 
-  await createClient().rpc("write_audit_log", {
+  await (await createClient()).rpc("write_audit_log", {
     p_module: "User", p_action: "UPDATE_USER", p_old_value: target?.role ?? "-", p_new_value: role, p_selection: "",
   });
   revalidatePath("/users");
@@ -119,7 +119,7 @@ export async function deleteUserAction(userId: string) {
   const { error } = await admin.auth.admin.deleteUser(userId);
   if (error) throw error;
 
-  await createClient().rpc("write_audit_log", {
+  await (await createClient()).rpc("write_audit_log", {
     p_module: "User", p_action: "DELETE_USER", p_old_value: target?.username ?? userId, p_new_value: "-", p_selection: "",
   });
   revalidatePath("/users");

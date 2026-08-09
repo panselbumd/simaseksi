@@ -1,7 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 
 export default async function CandidatesPage() {
-  const supabase = createClient();
+  const supabase = await createClient();
   const { data: candidates } = await supabase
     .from("candidates").select("id, nama, source_type, status, selections(nama)");
 
