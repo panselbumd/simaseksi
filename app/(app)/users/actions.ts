@@ -38,7 +38,7 @@ export async function createUserAction(formData: FormData) {
 
   // Structural rule "Admin = 1 akun" is enforced by a Postgres unique index
   // (uq_single_system_admin); give a friendlier message before hitting it.
-  if (role === "SYSTEM_ADMIN") {
+  
     const { count } = await admin.from("profiles").select("id", { count: "exact", head: true }).eq("role", "SYSTEM_ADMIN");
     if ((count ?? 0) >= 1) throw new Error("Sistem hanya boleh memiliki 1 akun Administrator Sistem. Nonaktifkan atau hapus akun admin lama terlebih dahulu.");
   }
