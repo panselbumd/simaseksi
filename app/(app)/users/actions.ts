@@ -36,12 +36,11 @@ export async function createUserAction(formData: FormData) {
     throw new Error("Administrator Sistem hanya dapat membuat akun Panitia Seleksi atau Tim UKK. Akun Peserta dibuat sendiri oleh peserta melalui pendaftaran seleksi.");
   }
 
-  // Structural rule "Admin = 1 akun" is enforced by a Postgres unique index
-  // (uq_single_system_admin); give a friendlier message before hitting it.
-  
-    const { count } = await admin.from("profiles").select("id", { count: "exact", head: true }).eq("role", "SYSTEM_ADMIN");
-    if ((count ?? 0) >= 1) throw new Error("Sistem hanya boleh memiliki 1 akun Administrator Sistem. Nonaktifkan atau hapus akun admin lama terlebih dahulu.");
-  }
+  // NOTE: no SYSTEM_ADMIN branch here — the guard above already restricts
+  // `role` to PANITIA_SELEKSI | TIM_UKK, so this action can never create a
+  // SYSTEM_ADMIN account. The "Admin = 1 akun" structural rule is enforced
+  // by a Postgres unique index (uq_single_system_admin) at the DB level,
+  // and has no code path to reach from here.
 
   const email = `${username}@simaseksi.local`;
   const { data, error } = await admin.auth.admin.createUser({ email, password, email_confirm: true });
