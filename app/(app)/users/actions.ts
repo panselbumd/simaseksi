@@ -28,6 +28,9 @@ export async function createUserAction(formData: FormData) {
   const unit = String(formData.get("unit") || "");
   const password = String(formData.get("password") || "password123");
   if (!username || !name || !role) throw new Error("Nama, username, dan peran wajib diisi.");
+  if (role === "PESERTA") {
+    throw new Error("Akun Peserta tidak dibuat di sini — peserta mendaftar mandiri lewat /daftar saat seleksi berstatus REGISTRATION.");
+  }
 
   // Structural rule "Admin = 1 akun" is enforced by a Postgres unique index
   // (uq_single_system_admin); give a friendlier message before hitting it.
