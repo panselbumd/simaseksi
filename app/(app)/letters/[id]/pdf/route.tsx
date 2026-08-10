@@ -1,7 +1,9 @@
 import { NextResponse } from "next/server";
+import { readFile } from "node:fs/promises";
+import path from "node:path";
 import { Document, Page, Text, View, Image, StyleSheet, Font, renderToBuffer } from "@react-pdf/renderer";
 import { createClient } from "@/lib/supabase/server";
-import { PAGE_MARGIN_CM, kopTitleFor, DEFAULT_KOP_ALAMAT } from "@/lib/letter-format";
+import { PAGE_MARGIN_CM, kopBannerAssetFor } from "@/lib/letter-format";
 import { fmtTanggalPanjang } from "@/lib/letter-templates";
 
 // Arial itself can't be bundled (proprietary), so we register Arimo — a
@@ -38,11 +40,8 @@ function makeStyles(fontFamily: string) {
       fontSize: 11,
       lineHeight: 1.5,
     },
-    kopRow: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 10, borderBottom: "1pt solid #333", paddingBottom: 8, marginBottom: 8 },
-    kopImg: { width: 46, height: 46 },
-    kopText: { textAlign: "center" },
-    kopTitle: { fontWeight: 700, fontSize: 12 },
-    kopSub: { fontSize: 9, color: "#333" },
+    kopRow: { borderBottom: "1pt solid #333", paddingBottom: 8, marginBottom: 8 },
+    kopImg: { width: "100%" },
     spacerLine: { marginBottom: 16 }, // ~1.5 line-height gap between kop & body
     right: { textAlign: "right", marginBottom: 12 },
     justify: { textAlign: "justify" },
@@ -65,14 +64,24 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
 
   const bumd = (letter as any).selections?.bumds;
   const bumdNama: string = bumd?.nama || "-";
-  const kopTitle = kopTitleFor(bumdNama);
-  const alamat = bumd?.alamat || DEFAULT_KOP_ALAMAT;
   const panitiaLabel = `Panitia Seleksi ${letter.jabatan ?? ""} ${bumdNama}`.trim();
 
-  let kopImageUrl: string | null = null;
+  // Custom override (uploaded to the Supabase "kop-surat" bucket) wins;
+  // otherwise use the bundled official letterhead banner straight off disk
+  // (no network round-trip, so PDF generation never depends on Storage being
+  // reachable for the two known BUMDs).
+  let kopImageSrc: string | null = null;
   if (bumd?.kop_image_path) {
     const { data: pub } = supabase.storage.from("kop-surat").getPublicUrl(bumd.kop_image_path);
-    kopImageUrl = pub.publicUrl;
+    kopImageSrc = pub.publicUrl;
+  } else {
+    try {
+      const assetPath = kopBannerAssetFor(bumdNama);
+      const buf = await readFile(path.join(process.cwd(), "public", assetPath));
+      kopImageSrc = `data:image/png;base64,${buf.toString("base64")}`;
+    } catch {
+      // Letter still generates without the banner if the asset is missing.
+    }
   }
 
   ensureFont();
@@ -82,14 +91,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
     <Document>
       <Page size="A4" style={styles.page}>
         <View style={styles.kopRow}>
-          {kopImageUrl && <Image src={kopImageUrl} style={styles.kopImg} />}
-          <View style={styles.kopText}>
-            <Text style={styles.kopTitle}>PEMERINTAH KOTA BATU</Text>
-            <Text style={styles.kopTitle}>{kopTitle}</Text>
-            <Text style={styles.kopTitle}>{bumdNama.toUpperCase()}</Text>
-            <Text style={styles.kopSub}>Sekretariat: Bagian Perekonomian dan Sumber Daya Alam</Text>
-            <Text style={styles.kopSub}>{alamat}</Text>
-          </View>
+          {kopImageSrc && <Image src={kopImageSrc} style={styles.kopImg} />}
         </View>
         <View style={styles.spacerLine} />
         <Text style={styles.right}>Kota Batu, {fmtTanggalPanjang(letter.tanggal)}</Text>

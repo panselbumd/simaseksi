@@ -39,5 +39,5 @@ export async function logoutAction() {
     p_module: "Authentication", p_action: "LOGOUT", p_old_value: "-", p_new_value: "-", p_selection: "",
   });
   await supabase.auth.signOut();
-  redirect("/login");
+  redirect("/");
 }

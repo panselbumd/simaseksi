@@ -41,3 +41,16 @@ export function kopTitleFor(bumdNama: string): string {
     ? "PANITIA SELEKSI CALON DIREKSI DAN CALON DEWAN PENGAWAS"
     : "PANITIA SELEKSI CALON DIREKSI DAN CALON KOMISARIS";
 }
+
+// Official kop surat letterhead banners (logo + full text baked in as a
+// single image), one per BUMD, bundled at public/kop-surat/ so letters
+// render correctly even before an admin uploads a custom kop_image_path to
+// the Supabase "kop-surat" storage bucket. Same source files as the
+// standalone index.html prototype's letter generator.
+export const KOP_BANNER_ASPECT_RATIO = 978 / 186; // width / height, shared by both banners
+
+export function kopBannerAssetFor(bumdNama: string): string {
+  return bumdNama.toLowerCase().includes("perumda")
+    ? "/kop-surat/kop-perumdam.png"
+    : "/kop-surat/kop-pt-bwr.png";
+}

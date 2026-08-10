@@ -5,3 +5,40 @@
 :root { --bg: #f6f7fb; }
 body { @apply bg-[--bg] text-ink-900 font-body antialiased; }
 h1,h2,h3,h4 { @apply font-display font-bold text-navy-900; }
+
+/*
+ * Dark mode — applied globally by overriding the app's own recurring
+ * utility classes (rather than adding dark: variants to every one of the
+ * ~40 page files), scoped under html.dark which ThemeToggle sets/removes.
+ * Colors are the same navy/gold palette from tailwind.config.ts, darkened.
+ */
+html.dark { color-scheme: dark; }
+.dark body { background-color: #0b1220; }
+.dark .bg-white { background-color: #111a2e !important; }
+.dark .bg-gray-50 { background-color: #16213a !important; }
+.dark .bg-gray-100 { background-color: #1a2740 !important; }
+.dark .bg-navy-50 { background-color: #16213a !important; }
+.dark .bg-navy-100 { background-color: #1c2c4a !important; }
+.dark .bg-amber-50 { background-color: #2a2313 !important; }
+.dark .bg-green-50 { background-color: #10261c !important; }
+.dark .bg-red-50 { background-color: #2a1416 !important; }
+.dark .bg-blue-50 { background-color: #10203a !important; }
+.dark .border-gray-100 { border-color: #223255 !important; }
+.dark .border-gray-200 { border-color: #263a5f !important; }
+.dark .border-gray-300 { border-color: #2c4066 !important; }
+.dark .border-gray-800 { border-color: #3a4d75 !important; }
+.dark .border-amber-200 { border-color: #4a3d1e !important; }
+.dark .text-ink-900 { color: #eef2f9 !important; }
+.dark .text-ink-700 { color: #c3ccdc !important; }
+.dark .text-ink-500 { color: #93a1ba !important; }
+.dark .text-ink-400 { color: #7a8aa8 !important; }
+.dark .text-amber-800 { color: #e8c874 !important; }
+.dark .text-gray-700 { color: #c3ccdc !important; }
+.dark h1, .dark h2, .dark h3, .dark h4 { color: #eef2f9 !important; }
+.dark input, .dark select, .dark textarea {
+  background-color: #16213a !important;
+  border-color: #2c4066 !important;
+  color: #eef2f9 !important;
+}
+.dark ::placeholder { color: #6b7a99 !important; }
+/* Sidebar/header stay navy in both modes by design — no override needed. */

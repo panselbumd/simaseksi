@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import GeneratorForm from "./GeneratorForm";
 import { finalizeLetterAction, deleteLetterAction } from "./actions";
+import { kopBannerAssetFor } from "@/lib/letter-format";
 
 export default async function LettersPage() {
   const supabase = await createClient();
@@ -22,7 +23,7 @@ export default async function LettersPage() {
     alamat: s.bumds?.alamat || null,
     kop_url: s.bumds?.kop_image_path
       ? supabase.storage.from("kop-surat").getPublicUrl(s.bumds.kop_image_path).data.publicUrl
-      : null,
+      : kopBannerAssetFor(s.bumds?.nama || ""),
   }));
 
   const { data: letters } = await supabase

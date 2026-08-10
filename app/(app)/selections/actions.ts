@@ -53,12 +53,11 @@ export async function createSelectionAction(formData: FormData) {
     .single();
   if (error) throw error;
 
-  // Add the creator as a Panitia Seleksi member on the new selection so
-  // the update/delete RLS policies (which check is_selection_member) let
-  // them keep editing it afterwards.
-  await supabase.from("selection_members").insert({
-    selection_id: created!.id, user_id: userId, member_role: "PANITIA_SELEKSI", posisi: "KETUA",
-  });
+  // Membership is now handled entirely by the trg_add_panitia_members
+  // trigger (migration 0006), which adds BOTH active Pansel accounts
+  // (Ketua + Anggota) as members — not just the creator — so every
+  // Panitia-scoped RLS policy (update, delete, candidates, documents,
+  // assessment, etc.) works correctly for either account.
 
   await supabase.rpc("write_audit_log", {
     p_module: "Seleksi", p_action: "CREATE_SELECTION", p_old_value: "-", p_new_value: values.nama, p_selection: created!.id,
@@ -83,8 +82,15 @@ export async function updateSelectionAction(id: string, formData: FormData) {
 
 export async function deleteSelectionAction(id: string, nama: string) {
   const { supabase } = await assertCanManage();
-  const { error } = await supabase.from("selections").delete().eq("id", id);
+  const { data: deleted, error } = await supabase.from("selections").delete().eq("id", id).select("id");
   if (error) throw error;
+  // Supabase's delete() does NOT throw when RLS silently filters out every
+  // row it would have matched — it just returns 0 affected rows. Checking
+  // explicitly turns that into a visible error instead of a button that
+  // looks like it worked but left the record untouched.
+  if (!deleted || deleted.length === 0) {
+    throw new Error("Seleksi tidak terhapus: Anda bukan anggota Panitia Seleksi untuk seleksi ini.");
+  }
 
   await supabase.rpc("write_audit_log", {
     p_module: "Seleksi", p_action: "DELETE_SELECTION", p_old_value: nama, p_new_value: "-", p_selection: "",

@@ -1,10 +1,14 @@
 import { NextResponse } from "next/server";
+import { readFile } from "node:fs/promises";
+import path from "node:path";
 import {
   Document, Packer, Paragraph, TextRun, ImageRun, AlignmentType, Table, TableRow, TableCell, WidthType, BorderStyle,
 } from "docx";
 import { createClient } from "@/lib/supabase/server";
-import { PAGE_MARGIN_TWIP, FONT_FAMILY, FONT_SIZE_HALF_PT, LINE_SPACING_DOCX } from "@/lib/letter-format";
-import { kopTitleFor, DEFAULT_KOP_ALAMAT } from "@/lib/letter-format";
+import {
+  PAGE_MARGIN_TWIP, FONT_FAMILY, FONT_SIZE_HALF_PT, LINE_SPACING_DOCX,
+  kopBannerAssetFor, KOP_BANNER_ASPECT_RATIO,
+} from "@/lib/letter-format";
 import { fmtTanggalPanjang } from "@/lib/letter-templates";
 
 const NO_BORDER = { style: BorderStyle.NONE, size: 0, color: "FFFFFF" } as const;
@@ -24,10 +28,10 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
 
   const bumd = (letter as any).selections?.bumds;
   const bumdNama: string = bumd?.nama || "-";
-  const kopTitle = kopTitleFor(bumdNama);
-  const alamat = bumd?.alamat || DEFAULT_KOP_ALAMAT;
   const panitiaLabel = `Panitia Seleksi ${letter.jabatan ?? ""} ${bumdNama}`.trim();
 
+  // Custom override (uploaded to the Supabase "kop-surat" bucket) wins;
+  // otherwise use the bundled official letterhead banner straight off disk.
   let kopImage: Buffer | null = null;
   if (bumd?.kop_image_path) {
     const { data: pub } = supabase.storage.from("kop-surat").getPublicUrl(bumd.kop_image_path);
@@ -35,7 +39,13 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
       const res = await fetch(pub.publicUrl);
       if (res.ok) kopImage = Buffer.from(await res.arrayBuffer());
     } catch {
-      // Letter still generates without the logo if Storage is unreachable.
+      // Letter still generates without the banner if Storage is unreachable.
+    }
+  } else {
+    try {
+      kopImage = await readFile(path.join(process.cwd(), "public", kopBannerAssetFor(bumdNama)));
+    } catch {
+      // Letter still generates without the banner if the asset is missing.
     }
   }
 
@@ -43,23 +53,22 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
   const run = (text: string, opts: Record<string, unknown> = {}) =>
     new TextRun({ text, font: FONT_FAMILY, size: FONT_SIZE_HALF_PT, ...opts });
 
+  // Page text width = A4 (21cm) minus left/right margins, converted cm -> px
+  // at 96dpi for the ImageRun transformation.
+  const PAGE_WIDTH_CM = 21;
+  const usableWidthCm = PAGE_WIDTH_CM - PAGE_MARGIN_TWIP.left / 566.929 - PAGE_MARGIN_TWIP.right / 566.929;
+  const kopImgWidthPx = Math.round((usableWidthCm / 2.54) * 96);
+  const kopImgHeightPx = Math.round(kopImgWidthPx / KOP_BANNER_ASPECT_RATIO);
+
   const kopParagraphs: Paragraph[] = [];
   if (kopImage) {
     kopParagraphs.push(new Paragraph({
       alignment: AlignmentType.CENTER,
-      children: [new ImageRun({ data: kopImage, transformation: { width: 60, height: 60 }, type: "png" })],
+      border: { bottom: { style: BorderStyle.SINGLE, size: 6, space: 4, color: "222222" } },
+      children: [new ImageRun({ data: kopImage, transformation: { width: kopImgWidthPx, height: kopImgHeightPx }, type: "png" })],
     }));
   }
   kopParagraphs.push(
-    new Paragraph({ alignment: AlignmentType.CENTER, children: [run("PEMERINTAH KOTA BATU", { bold: true })] }),
-    new Paragraph({ alignment: AlignmentType.CENTER, children: [run(kopTitle, { bold: true })] }),
-    new Paragraph({ alignment: AlignmentType.CENTER, children: [run(bumdNama.toUpperCase(), { bold: true })] }),
-    new Paragraph({ alignment: AlignmentType.CENTER, children: [run("Sekretariat: Bagian Perekonomian dan Sumber Daya Alam", { size: FONT_SIZE_HALF_PT - 2 })] }),
-    new Paragraph({
-      alignment: AlignmentType.CENTER,
-      border: { bottom: { style: BorderStyle.SINGLE, size: 6, space: 4, color: "222222" } },
-      children: [run(alamat, { size: FONT_SIZE_HALF_PT - 2 })],
-    }),
     // Jarak kop surat ke isi surat: 1,5 spasi.
     new Paragraph({ spacing, children: [run("")] }),
   );

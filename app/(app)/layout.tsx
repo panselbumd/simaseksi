@@ -2,6 +2,9 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { hasPermission, ROLE_LABEL, type AppRole } from "@/lib/rbac";
 import { logoutAction } from "@/app/login/actions";
+import ThemeToggle from "@/components/ThemeToggle";
+import SidebarScrollButtons from "@/components/SidebarScrollButtons";
+import MainScrollControls from "@/components/MainScrollControls";
 
 const NAV: { section: string; items: { href: string; label: string; perm: string }[] }[] = [
   { section: "Utama", items: [{ href: "/dashboard", label: "Dashboard", perm: "dashboard.view" }] },
@@ -54,7 +57,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
             <div className="text-[10px] text-slate-400">{ROLE_LABEL[role]}</div>
           </div>
         </div>
-        <nav className="flex-1 px-2.5 py-3 overflow-y-auto">
+        <nav id="sidebar-nav" className="flex-1 px-2.5 py-3 overflow-y-auto">
           {NAV.map((sec) => {
             const items = sec.items.filter((it) => hasPermission(role, it.perm));
             if (!items.length) return null;
@@ -70,6 +73,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
             );
           })}
         </nav>
+        <SidebarScrollButtons />
         <div className="px-4 py-3 border-t border-white/10 text-[11px] text-slate-500">
           <div>© 2026 SIMASEKSI</div>
           <div>Next.js · Supabase · Vercel</div>
@@ -80,6 +84,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         <header className="h-14 bg-white border-b border-gray-200 flex items-center justify-between px-6 sticky top-0 z-10">
           <div className="text-xs text-ink-500">SIMASEKSI</div>
           <div className="flex items-center gap-3">
+            <ThemeToggle />
             <div className="text-right">
               <div className="text-xs font-semibold text-ink-900">{profile.name}</div>
               <div className="text-[10px] text-ink-500">{ROLE_LABEL[role]}</div>
@@ -92,7 +97,8 @@ export default async function AppLayout({ children }: { children: React.ReactNod
             </form>
           </div>
         </header>
-        <main className="p-7">{children}</main>
+        <main id="main-content" className="p-7 overflow-auto" style={{ maxHeight: "calc(100vh - 3.5rem)" }}>{children}</main>
+        <MainScrollControls />
       </div>
     </div>
   );
