@@ -70,14 +70,74 @@ export async function createLetterAction(formData: FormData) {
   return inserted?.id as string;
 }
 
+// Panitia: ubah draf yang sudah tersimpan (nomor/tanggal/peserta/periode/
+// jenis surat) — isi dihitung ulang persis seperti saat pembuatan. Hanya
+// berlaku selama draf masih berstatus DRAFT.
+export async function updateLetterAction(id: string, formData: FormData) {
+  const { supabase, role } = await currentProfile();
+  if (role !== "PANITIA_SELEKSI") throw new Error("Hanya Panitia Seleksi yang dapat mengubah draf surat.");
+
+  const jenis_surat = String(formData.get("jenis_surat") || "");
+  const nomor = String(formData.get("nomor") || "").trim();
+  const tanggal = String(formData.get("tanggal") || "");
+  const nama_peserta = String(formData.get("nama_peserta") || "").trim();
+  const periode = String(formData.get("periode") || "").trim();
+
+  const tpl = findTemplate(jenis_surat);
+  if (!tpl) throw new Error("Jenis surat tidak dikenali.");
+  if (!nomor || !tanggal) throw new Error("Nomor dan tanggal wajib diisi.");
+
+  const { data: existing, error: findErr } = await supabase
+    .from("letters")
+    .select("id, status, selection_id, selections(jabatan, dasar_hukum, bumds(nama))")
+    .eq("id", id)
+    .single();
+  if (findErr || !existing) throw new Error("Draf surat tidak ditemukan.");
+  if (existing.status !== "DRAFT") throw new Error("Surat yang sudah Final tidak dapat diubah.");
+
+  const sel = (existing as any).selections;
+  const bumdNama = sel?.bumds?.nama || "-";
+  const jabatan = sel?.jabatan || "-";
+  const panitia = `Panitia Seleksi ${jabatan} ${bumdNama}`;
+  const data: Record<string, string> = {
+    NOMOR: nomor,
+    TANGGAL: fmtTanggalPanjang(tanggal),
+    BUMD: bumdNama,
+    NAMA_PESERTA: nama_peserta || "[Nama Peserta]",
+    JABATAN: jabatan,
+    PERIODE: periode || "-",
+    DASAR_HUKUM: sel?.dasar_hukum || "—",
+    PANITIA: panitia,
+    TIM_UKK: "Tim Uji Kompetensi dan Kelayakan",
+  };
+  const isi = fillTemplate(tpl.template, data);
+
+  const { error } = await supabase
+    .from("letters")
+    .update({
+      jenis_surat, nama_surat: tpl.nama, nomor, tanggal,
+      nama_peserta: nama_peserta || null, periode: periode || null, isi,
+    })
+    .eq("id", id)
+    .eq("status", "DRAFT");
+  if (error) throw error;
+
+  await supabase.rpc("write_audit_log", {
+    p_module: "Letter", p_action: "UPDATE_LETTER", p_old_value: "-", p_new_value: tpl.nama, p_selection: existing.selection_id,
+  });
+  revalidatePath("/letters");
+  revalidatePath(`/letters/${id}/edit`);
+}
+
 // Panitia: tandai draf sebagai Final (mengunci nomor/isi sebagai catatan
 // audit — surat tetap "bahan bantu", bukan Keputusan resmi; itu tetap lewat
 // modul Keputusan yang hanya bisa diterbitkan KPM/Pejabat Berwenang).
 export async function finalizeLetterAction(id: string) {
   const { supabase, role } = await currentProfile();
   if (role !== "PANITIA_SELEKSI") throw new Error("Hanya Panitia Seleksi yang dapat memfinalisasi draf surat.");
-  const { error } = await supabase.from("letters").update({ status: "FINAL" }).eq("id", id);
+  const { data: updated, error } = await supabase.from("letters").update({ status: "FINAL" }).eq("id", id).select("id");
   if (error) throw error;
+  if (!updated || updated.length === 0) throw new Error("Surat tidak difinalisasi: tidak ditemukan atau Anda tidak berwenang.");
   await supabase.rpc("write_audit_log", {
     p_module: "Letter", p_action: "FINALIZE_LETTER", p_old_value: "DRAFT", p_new_value: "FINAL", p_selection: "",
   });
@@ -89,7 +149,8 @@ export async function finalizeLetterAction(id: string) {
 export async function deleteLetterAction(id: string) {
   const { supabase, role } = await currentProfile();
   if (role !== "PANITIA_SELEKSI") throw new Error("Hanya Panitia Seleksi yang dapat menghapus draf surat.");
-  const { error } = await supabase.from("letters").delete().eq("id", id).eq("status", "DRAFT");
+  const { data: deleted, error } = await supabase.from("letters").delete().eq("id", id).eq("status", "DRAFT").select("id");
   if (error) throw error;
+  if (!deleted || deleted.length === 0) throw new Error("Draf tidak terhapus: tidak ditemukan, sudah Final, atau Anda tidak berwenang.");
   revalidatePath("/letters");
 }
