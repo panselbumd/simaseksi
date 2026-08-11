@@ -3,8 +3,16 @@ import GeneratorForm from "./GeneratorForm";
 import { finalizeLetterAction, deleteLetterAction } from "./actions";
 import { kopBannerAssetFor } from "@/lib/letter-format";
 
-export default async function LettersPage({ searchParams }: { searchParams: Promise<{ selection?: string }> }) {
-  const { selection: preselectedSelectionId } = await searchParams;
+export default async function LettersPage({ searchParams }: { searchParams?: Promise<{ selection?: string }> }) {
+  // Defensive: on some client-triggered refreshes Next.js may not thread a
+  // searchParams value at all (no query string present), so `searchParams`
+  // itself can be undefined rather than a Promise that resolves to `{}`.
+  // Awaiting undefined is harmless, but destructuring it directly would
+  // throw ("Cannot destructure property 'selection' of undefined") and
+  // crash this whole page's render — which is exactly the kind of error a
+  // Server Component render failure looks like from the outside.
+  const resolvedSearchParams = (await searchParams) ?? {};
+  const preselectedSelectionId = resolvedSearchParams.selection;
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   const { data: profile } = await supabase.from("profiles").select("role").eq("id", user!.id).single();
