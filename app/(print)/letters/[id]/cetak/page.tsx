@@ -16,11 +16,7 @@ export default async function LetterPrintPage({ params }: { params: Promise<{ id
   const bumd = (letter as any).selections?.bumds;
   const bumdNama: string = bumd?.nama || "-";
   const panitiaLabel = `Panitia Seleksi ${letter.jabatan ?? ""} ${bumdNama}`.trim();
-  // Custom override (uploaded to the Supabase "kop-surat" bucket) wins;
-  // otherwise fall back to the bundled official letterhead banner.
-  const kopUrl = bumd?.kop_image_path
-    ? supabase.storage.from("kop-surat").getPublicUrl(bumd.kop_image_path).data.publicUrl
-    : kopBannerAssetFor(bumdNama);
+  const kopUrl = kopBannerAssetFor(bumdNama);
 
   return (
     <>

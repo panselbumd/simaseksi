@@ -68,6 +68,18 @@ export const REPORT_DEFS: ReportDef[] = [
       (await supabase.from("v_candidate_ranking").select("nama, final_score, ranking").order("ranking", { ascending: true })).data ?? [],
   },
   {
+    key: "naskah", label: "Laporan Naskah Dinas (Surat)",
+    headers: [
+      { label: "Jenis Surat", get: (r) => r.nama_surat },
+      { label: "Nomor", get: (r) => r.nomor },
+      { label: "Tanggal", get: (r) => (r.tanggal ? new Date(r.tanggal).toLocaleDateString("id-ID") : "-") },
+      { label: "Seleksi", get: (r) => r.selections?.nama ?? "-" },
+      { label: "Status", get: (r) => (r.status === "FINAL" ? "Final" : "Draf") },
+    ],
+    fetch: async (supabase) =>
+      (await supabase.from("letters").select("nama_surat, nomor, tanggal, status, selections(nama)").order("tanggal", { ascending: false })).data ?? [],
+  },
+  {
     key: "audit", label: "Laporan Audit",
     headers: [
       { label: "Waktu", get: (r) => new Date(r.timestamp).toLocaleString("id-ID") },

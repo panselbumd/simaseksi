@@ -21,9 +21,7 @@ export default async function LettersPage() {
     dasar_hukum: s.dasar_hukum,
     bumd_nama: s.bumds?.nama || "-",
     alamat: s.bumds?.alamat || null,
-    kop_url: s.bumds?.kop_image_path
-      ? supabase.storage.from("kop-surat").getPublicUrl(s.bumds.kop_image_path).data.publicUrl
-      : kopBannerAssetFor(s.bumds?.nama || ""),
+    kop_url: kopBannerAssetFor(s.bumds?.nama || ""),
   }));
 
   const { data: letters } = await supabase

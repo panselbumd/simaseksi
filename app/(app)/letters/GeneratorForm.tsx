@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import { LETTER_TEMPLATES, fillTemplate, fmtTanggalPanjang } from "@/lib/letter-templates";
 import { createLetterAction } from "./actions";
 
@@ -15,6 +16,7 @@ type SelectionOption = {
 };
 
 export default function GeneratorForm({ selections }: { selections: SelectionOption[] }) {
+  const router = useRouter();
   const [jenisId, setJenisId] = useState(LETTER_TEMPLATES[0].id);
   const [selectionId, setSelectionId] = useState(selections[0]?.id ?? "");
   const [nomor, setNomor] = useState("");
@@ -22,7 +24,7 @@ export default function GeneratorForm({ selections }: { selections: SelectionOpt
   const [namaPeserta, setNamaPeserta] = useState("");
   const [periode, setPeriode] = useState("2026-2031");
   const [saving, setSaving] = useState(false);
-  const [savedMsg, setSavedMsg] = useState<string | null>(null);
+  const [msg, setMsg] = useState<{ type: "ok" | "error"; text: string } | null>(null);
 
   const tpl = LETTER_TEMPLATES.find((t) => t.id === jenisId)!;
   const sel = selections.find((s) => s.id === selectionId);
@@ -46,14 +48,19 @@ export default function GeneratorForm({ selections }: { selections: SelectionOpt
 
   async function handleSubmit(formData: FormData) {
     setSaving(true);
-    setSavedMsg(null);
+    setMsg(null);
     try {
       await createLetterAction(formData);
-      setSavedMsg("Draf surat tersimpan.");
+      setMsg({ type: "ok", text: "Draf surat tersimpan — lihat di daftar \u201cDraf Tersimpan\u201d di bawah." });
       setNomor("");
       setNamaPeserta("");
+      // revalidatePath() in the server action only invalidates the cache —
+      // it does NOT re-render this already-mounted page, so without this
+      // the new draft silently never shows up in the list below and it
+      // looks like saving did nothing even though it succeeded.
+      router.refresh();
     } catch (e: any) {
-      setSavedMsg(e.message || "Gagal menyimpan draf.");
+      setMsg({ type: "error", text: e?.message || "Gagal menyimpan draf." });
     } finally {
       setSaving(false);
     }
@@ -62,6 +69,7 @@ export default function GeneratorForm({ selections }: { selections: SelectionOpt
   return (
     <div className="grid gap-6" style={{ gridTemplateColumns: "340px 1fr" }}>
       <form action={handleSubmit} className="bg-white border border-gray-200 rounded-md p-5 space-y-3 h-fit">
+        <div className="text-sm font-display font-bold text-navy-900 mb-1">+ Tambah Surat Baru</div>
         <div>
           <label className="block text-xs font-semibold mb-1">Jenis Surat</label>
           <select name="jenis_surat" value={jenisId} onChange={(e) => setJenisId(e.target.value)} className="w-full border border-gray-200 rounded-md px-2.5 py-1.5 text-sm">
@@ -93,7 +101,11 @@ export default function GeneratorForm({ selections }: { selections: SelectionOpt
         <button type="submit" disabled={saving || !selectionId} className="w-full bg-navy-900 text-white text-sm font-semibold rounded-md px-4 py-2 disabled:opacity-50">
           {saving ? "Menyimpan..." : "Simpan sebagai Draf"}
         </button>
-        {savedMsg && <div className="text-xs text-navy-700">{savedMsg}</div>}
+        {msg && (
+          <div className={`text-xs rounded-md p-2.5 font-medium ${msg.type === "error" ? "bg-red-50 text-red-700 border border-red-200" : "bg-green-50 text-green-800 border border-green-200"}`}>
+            {msg.text}
+          </div>
+        )}
       </form>
 
       <div>

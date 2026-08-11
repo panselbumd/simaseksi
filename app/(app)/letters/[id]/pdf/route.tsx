@@ -66,22 +66,16 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
   const bumdNama: string = bumd?.nama || "-";
   const panitiaLabel = `Panitia Seleksi ${letter.jabatan ?? ""} ${bumdNama}`.trim();
 
-  // Custom override (uploaded to the Supabase "kop-surat" bucket) wins;
-  // otherwise use the bundled official letterhead banner straight off disk
-  // (no network round-trip, so PDF generation never depends on Storage being
-  // reachable for the two known BUMDs).
+  // Always the bundled official letterhead banner, read straight off disk
+  // (no network round-trip; see lib/letter-format.ts for why we don't read
+  // bumds.kop_image_path / Supabase Storage here).
   let kopImageSrc: string | null = null;
-  if (bumd?.kop_image_path) {
-    const { data: pub } = supabase.storage.from("kop-surat").getPublicUrl(bumd.kop_image_path);
-    kopImageSrc = pub.publicUrl;
-  } else {
-    try {
-      const assetPath = kopBannerAssetFor(bumdNama);
-      const buf = await readFile(path.join(process.cwd(), "public", assetPath));
-      kopImageSrc = `data:image/png;base64,${buf.toString("base64")}`;
-    } catch {
-      // Letter still generates without the banner if the asset is missing.
-    }
+  try {
+    const assetPath = kopBannerAssetFor(bumdNama);
+    const buf = await readFile(path.join(process.cwd(), "public", assetPath));
+    kopImageSrc = `data:image/jpeg;base64,${buf.toString("base64")}`;
+  } catch {
+    // Letter still generates without the banner if the asset is missing.
   }
 
   ensureFont();

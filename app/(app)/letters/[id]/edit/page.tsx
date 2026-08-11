@@ -21,9 +21,7 @@ export default async function EditLetterPage({ params }: { params: Promise<{ id:
   const canEdit = hasPermission(role, "letter.manage") && letter.status === "DRAFT";
   const sel = (letter as any).selections;
   const bumdNama: string = sel?.bumds?.nama || "-";
-  const kopUrl = sel?.bumds?.kop_image_path
-    ? supabase.storage.from("kop-surat").getPublicUrl(sel.bumds.kop_image_path).data.publicUrl
-    : kopBannerAssetFor(bumdNama);
+  const kopUrl = kopBannerAssetFor(bumdNama);
 
   return (
     <div>

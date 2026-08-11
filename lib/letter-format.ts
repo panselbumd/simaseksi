@@ -43,14 +43,30 @@ export function kopTitleFor(bumdNama: string): string {
 }
 
 // Official kop surat letterhead banners (logo + full text baked in as a
-// single image), one per BUMD, bundled at public/kop-surat/ so letters
-// render correctly even before an admin uploads a custom kop_image_path to
-// the Supabase "kop-surat" storage bucket. Same source files as the
-// standalone index.html prototype's letter generator.
-export const KOP_BANNER_ASPECT_RATIO = 978 / 186; // width / height, shared by both banners
+// single image), one per BUMD, bundled at public/kop-surat/. These are
+// always used directly — we deliberately do NOT read bumds.kop_image_path
+// / Supabase Storage here. That indirection previously broke the
+// letterhead in every letter: seed.sql pre-fills kop_image_path with a
+// bare filename for both BUMDs, so the "use a custom Storage upload"
+// branch was always taken even though nothing was ever actually uploaded
+// to the "kop-surat" Storage bucket at that path — the banner 404'd
+// silently every time. With only two BUMDs and no admin UI to manage a
+// custom upload yet, matching by name to a bundled file is the reliable
+// option; revisit if/when a real upload feature is built.
+export const KOP_BANNERS = {
+  perumdam: { path: "/kop-surat/kop-perumdam.jpg", width: 2000, height: 411 },
+  ptBwr: { path: "/kop-surat/kop-pt-bwr.jpg", width: 2000, height: 389 },
+} as const;
+
+function kopBannerFor(bumdNama: string) {
+  return bumdNama.toLowerCase().includes("perumda") ? KOP_BANNERS.perumdam : KOP_BANNERS.ptBwr;
+}
 
 export function kopBannerAssetFor(bumdNama: string): string {
-  return bumdNama.toLowerCase().includes("perumda")
-    ? "/kop-surat/kop-perumdam.png"
-    : "/kop-surat/kop-pt-bwr.png";
+  return kopBannerFor(bumdNama).path;
+}
+
+export function kopBannerAspectRatioFor(bumdNama: string): number {
+  const b = kopBannerFor(bumdNama);
+  return b.width / b.height;
 }

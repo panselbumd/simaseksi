@@ -7,7 +7,7 @@ import {
 import { createClient } from "@/lib/supabase/server";
 import {
   PAGE_MARGIN_TWIP, FONT_FAMILY, FONT_SIZE_HALF_PT, LINE_SPACING_DOCX,
-  kopBannerAssetFor, KOP_BANNER_ASPECT_RATIO,
+  kopBannerAssetFor, kopBannerAspectRatioFor,
 } from "@/lib/letter-format";
 import { fmtTanggalPanjang } from "@/lib/letter-templates";
 
@@ -30,23 +30,14 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
   const bumdNama: string = bumd?.nama || "-";
   const panitiaLabel = `Panitia Seleksi ${letter.jabatan ?? ""} ${bumdNama}`.trim();
 
-  // Custom override (uploaded to the Supabase "kop-surat" bucket) wins;
-  // otherwise use the bundled official letterhead banner straight off disk.
+  // Always the bundled official letterhead banner, read straight off disk
+  // (see lib/letter-format.ts for why we don't read bumds.kop_image_path /
+  // Supabase Storage here).
   let kopImage: Buffer | null = null;
-  if (bumd?.kop_image_path) {
-    const { data: pub } = supabase.storage.from("kop-surat").getPublicUrl(bumd.kop_image_path);
-    try {
-      const res = await fetch(pub.publicUrl);
-      if (res.ok) kopImage = Buffer.from(await res.arrayBuffer());
-    } catch {
-      // Letter still generates without the banner if Storage is unreachable.
-    }
-  } else {
-    try {
-      kopImage = await readFile(path.join(process.cwd(), "public", kopBannerAssetFor(bumdNama)));
-    } catch {
-      // Letter still generates without the banner if the asset is missing.
-    }
+  try {
+    kopImage = await readFile(path.join(process.cwd(), "public", kopBannerAssetFor(bumdNama)));
+  } catch {
+    // Letter still generates without the banner if the asset is missing.
   }
 
   const spacing = { line: LINE_SPACING_DOCX, lineRule: "auto" as const };
@@ -58,14 +49,14 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
   const PAGE_WIDTH_CM = 21;
   const usableWidthCm = PAGE_WIDTH_CM - PAGE_MARGIN_TWIP.left / 566.929 - PAGE_MARGIN_TWIP.right / 566.929;
   const kopImgWidthPx = Math.round((usableWidthCm / 2.54) * 96);
-  const kopImgHeightPx = Math.round(kopImgWidthPx / KOP_BANNER_ASPECT_RATIO);
+  const kopImgHeightPx = Math.round(kopImgWidthPx / kopBannerAspectRatioFor(bumdNama));
 
   const kopParagraphs: Paragraph[] = [];
   if (kopImage) {
     kopParagraphs.push(new Paragraph({
       alignment: AlignmentType.CENTER,
       border: { bottom: { style: BorderStyle.SINGLE, size: 6, space: 4, color: "222222" } },
-      children: [new ImageRun({ data: kopImage, transformation: { width: kopImgWidthPx, height: kopImgHeightPx }, type: "png" })],
+      children: [new ImageRun({ data: kopImage, transformation: { width: kopImgWidthPx, height: kopImgHeightPx }, type: "jpg" })],
     }));
   }
   kopParagraphs.push(
