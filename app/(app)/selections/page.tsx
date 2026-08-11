@@ -62,7 +62,7 @@ export default async function SelectionsPage() {
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-3 text-xs">
                       <Link href={`/selections/${s.id}/edit`} className="text-navy-700 underline">Edit</Link>
-                      <Link href={`/letters?selection=${s.id}`} className="text-navy-700 underline">Cetak/Unduh Surat</Link>
+                      <Link href={`/selections/${s.id}/surat`} className="text-navy-700 underline">Cetak/Unduh Surat</Link>
                       <DeleteSelectionButton id={s.id} nama={s.nama} />
                     </div>
                   </td>

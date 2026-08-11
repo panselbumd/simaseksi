@@ -35,7 +35,12 @@ export async function createLetterAction(formData: FormData) {
     .select("id, jabatan, dasar_hukum, bumds(nama)")
     .eq("id", selection_id)
     .single();
-  if (!sel) throw new Error("Seleksi tidak ditemukan.");
+  if (!sel) {
+    throw new Error(
+      "Seleksi tidak ditemukan atau Anda tidak terdaftar sebagai anggota Panitia Seleksi untuk seleksi ini. " +
+      "Jika seharusnya Anda punya akses, pastikan migration_0006_fix_pansel_membership.sql sudah dijalankan di Supabase."
+    );
+  }
 
   const bumdNama = (sel as any).bumds?.nama || "-";
   const panitia = `Panitia Seleksi ${sel.jabatan} ${bumdNama}`;

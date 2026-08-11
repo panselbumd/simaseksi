@@ -1,65 +1,61 @@
+import { notFound } from "next/navigation";
+import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
-import GeneratorForm from "./GeneratorForm";
-import { finalizeLetterAction, deleteLetterAction } from "./actions";
-import { kopBannerAssetFor } from "@/lib/letter-format";
+import { hasPermission, type AppRole } from "@/lib/rbac";
+import { finalizeLetterAction, deleteLetterAction } from "@/app/(app)/letters/actions";
 
-export default async function LettersPage({ searchParams }: { searchParams: Promise<{ selection?: string }> }) {
-  const { selection: preselectedSelectionId } = await searchParams;
+// "Cetak/Unduh Surat" from Manajemen Seleksi opens here — a view scoped to
+// this one selection's own letters, without leaving the Selections module
+// (previously this linked out to the separate Generator Surat menu, which
+// dropped the selection context and felt like a broken/wrong link).
+// Drafting brand-new letters still happens in Generator Surat (it needs the
+// jenis-surat template picker), but every letter already drafted for this
+// selection can be viewed/printed/downloaded/finalized/deleted right here.
+export default async function SelectionSuratPage({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   const { data: profile } = await supabase.from("profiles").select("role").eq("id", user!.id).single();
-  const role = profile?.role;
+  const role = profile?.role as AppRole;
 
-  const { data: selectionsRaw } = await supabase
+  const { data: selection } = await supabase
     .from("selections")
-    .select("id, nama, jabatan, dasar_hukum, bumds(nama, kop_image_path, alamat)")
-    .order("created_at", { ascending: false });
-
-  const selections = (selectionsRaw ?? []).map((s: any) => ({
-    id: s.id,
-    nama: s.nama,
-    jabatan: s.jabatan,
-    dasar_hukum: s.dasar_hukum,
-    bumd_nama: s.bumds?.nama || "-",
-    alamat: s.bumds?.alamat || null,
-    kop_url: kopBannerAssetFor(s.bumds?.nama || ""),
-  }));
+    .select("id, nama, jabatan, status, bumds(nama)")
+    .eq("id", id)
+    .single();
+  if (!selection) notFound();
 
   const { data: letters } = await supabase
     .from("letters")
-    .select("id, nama_surat, nomor, tanggal, status, created_at, selections(nama)")
+    .select("id, nama_surat, nomor, tanggal, status")
+    .eq("selection_id", id)
     .order("created_at", { ascending: false });
+
+  const canManageLetters = role === "PANITIA_SELEKSI";
 
   return (
     <div>
-      <h1 className="text-2xl font-display font-bold text-navy-900 mb-1">Generator Surat</h1>
-      <p className="text-sm text-ink-500 mb-6 max-w-2xl">
-        Susun draf surat resmi dengan kop surat panitia seleksi terkait. Format mengikuti tata naskah dinas
-        pemerintah daerah: font Arial 11pt, margin 1,5/2,5/2/2 cm, spasi 1,5, rata kiri-kanan.
-      </p>
-
-      {role === "PANITIA_SELEKSI" && selections.length > 0 && (
-        <div className="mb-8">
-          <GeneratorForm selections={selections} initialSelectionId={preselectedSelectionId} />
+      <Link href="/selections" className="text-xs text-navy-700 underline">&larr; Kembali ke Manajemen Seleksi</Link>
+      <div className="flex items-start justify-between mb-1 mt-2">
+        <div>
+          <h1 className="text-2xl font-display font-bold text-navy-900">Cetak / Unduh Surat</h1>
+          <p className="text-sm text-ink-500">{selection.nama} — {(selection as any).bumds?.nama}</p>
         </div>
-      )}
-      {role === "PANITIA_SELEKSI" && selections.length === 0 && (
-        <div className="mb-8 bg-amber-50 border border-amber-200 text-amber-800 text-sm rounded-md p-4">
-          <b>Belum ada seleksi yang bisa Anda kelola suratnya.</b>{" "}
-          Akun Anda belum tercatat sebagai anggota Panitia Seleksi pada seleksi manapun, sehingga formulir
-          "Tambah Surat Baru" belum bisa ditampilkan. Ini biasanya berarti migrasi database{" "}
-          <code className="bg-amber-100 px-1 rounded">migration_0006_fix_pansel_membership.sql</code> belum
-          dijalankan di Supabase — jalankan migrasi tersebut lalu muat ulang halaman ini.
-        </div>
-      )}
+        {canManageLetters && (
+          <Link
+            href={`/letters?selection=${id}`}
+            className="text-xs border border-navy-200 text-navy-700 font-semibold rounded-md px-3 py-2 whitespace-nowrap hover:bg-navy-50"
+          >
+            + Susun Surat Baru di Generator Surat
+          </Link>
+        )}
+      </div>
 
-      <h2 className="text-sm font-bold text-navy-900 mb-3">Draf Tersimpan</h2>
-      <div className="bg-white border border-gray-200 rounded-md overflow-hidden">
+      <div className="bg-white border border-gray-200 rounded-md overflow-hidden mt-6">
         <table className="w-full text-sm">
           <thead>
             <tr className="bg-navy-50 text-left text-[11px] uppercase text-ink-700">
               <th className="px-4 py-3">Jenis</th>
-              <th className="px-4 py-3">Seleksi</th>
               <th className="px-4 py-3">Nomor</th>
               <th className="px-4 py-3">Tanggal</th>
               <th className="px-4 py-3">Status</th>
@@ -70,7 +66,6 @@ export default async function LettersPage({ searchParams }: { searchParams: Prom
             {letters?.map((l: any) => (
               <tr key={l.id} className="border-t border-gray-100 align-top">
                 <td className="px-4 py-3 font-medium">{l.nama_surat}</td>
-                <td className="px-4 py-3">{l.selections?.nama}</td>
                 <td className="px-4 py-3">{l.nomor}</td>
                 <td className="px-4 py-3">{new Date(l.tanggal).toLocaleDateString("id-ID")}</td>
                 <td className="px-4 py-3">
@@ -83,7 +78,7 @@ export default async function LettersPage({ searchParams }: { searchParams: Prom
                     <a href={`/letters/${l.id}/cetak`} target="_blank" rel="noreferrer" className="text-xs border border-gray-200 rounded-md px-2.5 py-1 hover:bg-gray-50">Lihat / Cetak</a>
                     <a href={`/letters/${l.id}/docx`} className="text-xs bg-navy-50 text-navy-800 font-semibold rounded-md px-2.5 py-1 hover:bg-navy-100">Unduh Word</a>
                     <a href={`/letters/${l.id}/pdf`} className="text-xs bg-navy-50 text-navy-800 font-semibold rounded-md px-2.5 py-1 hover:bg-navy-100">Unduh PDF</a>
-                    {role === "PANITIA_SELEKSI" && l.status === "DRAFT" && (
+                    {canManageLetters && l.status === "DRAFT" && (
                       <>
                         <a href={`/letters/${l.id}/edit`} className="text-xs border border-navy-200 text-navy-700 font-semibold rounded-md px-2.5 py-1 hover:bg-navy-50">Edit</a>
                         <form action={finalizeLetterAction.bind(null, l.id)}>
@@ -99,7 +94,10 @@ export default async function LettersPage({ searchParams }: { searchParams: Prom
               </tr>
             )) ?? null}
             {(!letters || letters.length === 0) && (
-              <tr><td colSpan={6} className="px-4 py-8 text-center text-ink-500">Belum ada draf surat.</td></tr>
+              <tr><td colSpan={5} className="px-4 py-8 text-center text-ink-500">
+                Belum ada surat untuk seleksi ini.
+                {canManageLetters && <> Susun draf pertama lewat <Link href={`/letters?selection=${id}`} className="text-navy-700 underline">Generator Surat</Link>.</>}
+              </td></tr>
             )}
           </tbody>
         </table>

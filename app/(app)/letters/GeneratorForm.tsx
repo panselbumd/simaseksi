@@ -15,10 +15,12 @@ type SelectionOption = {
   alamat: string | null;
 };
 
-export default function GeneratorForm({ selections }: { selections: SelectionOption[] }) {
+export default function GeneratorForm({ selections, initialSelectionId }: { selections: SelectionOption[]; initialSelectionId?: string }) {
   const router = useRouter();
   const [jenisId, setJenisId] = useState(LETTER_TEMPLATES[0].id);
-  const [selectionId, setSelectionId] = useState(selections[0]?.id ?? "");
+  const [selectionId, setSelectionId] = useState(
+    (initialSelectionId && selections.some((s) => s.id === initialSelectionId)) ? initialSelectionId : (selections[0]?.id ?? "")
+  );
   const [nomor, setNomor] = useState("");
   const [tanggal, setTanggal] = useState(new Date().toISOString().slice(0, 10));
   const [namaPeserta, setNamaPeserta] = useState("");
