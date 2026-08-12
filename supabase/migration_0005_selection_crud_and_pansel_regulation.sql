@@ -41,3 +41,7 @@ create policy "selection_members_insert_creator"
       where s.id = selection_id and s.created_by = auth.uid()
     )
   );
+
+-- Beritahu PostgREST agar refresh cache skema (tabel/relasi baru dari
+-- migrasi ini langsung dikenali tanpa perlu restart manual).
+NOTIFY pgrst, 'reload schema';

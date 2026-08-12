@@ -48,3 +48,7 @@ create policy "applicants_insert_self"
       where s.id = selection_id and s.status = 'REGISTRATION'
     )
   );
+
+-- Beritahu PostgREST agar refresh cache skema (tabel/relasi baru dari
+-- migrasi ini langsung dikenali tanpa perlu restart manual).
+NOTIFY pgrst, 'reload schema';

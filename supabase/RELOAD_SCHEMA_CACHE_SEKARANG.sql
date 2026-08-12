@@ -1,0 +1,15 @@
+-- Jalankan ini SEKARANG di Supabase SQL Editor untuk memperbaiki error
+-- "Could not find a relationship between 'letters' and 'selections' in
+-- the schema cache".
+--
+-- Penyebabnya: relasi (foreign key) letters.selection_id -> selections.id
+-- SUDAH benar di database (didefinisikan sejak migration_0004_letters.sql)
+-- — tapi PostgREST (lapisan API yang dipakai Supabase untuk melayani
+-- query supabase-js, termasuk fitur "embed" seperti `selections(nama)`
+-- yang dipakai di menu Generator Surat) menyimpan cache skema database
+-- sendiri secara terpisah, dan cache itu belum di-refresh sejak tabel
+-- `letters` dibuat lewat SQL Editor manual (berbeda dengan migrasi lewat
+-- Supabase CLI/Dashboard yang biasanya otomatis memicu refresh ini).
+--
+-- Perintah ini aman dijalankan kapan saja, termasuk berkali-kali.
+NOTIFY pgrst, 'reload schema';

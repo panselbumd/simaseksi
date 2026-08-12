@@ -17,3 +17,7 @@
 -- ============================================================================
 
 alter view public.v_candidate_ranking set (security_invoker = true);
+
+-- Beritahu PostgREST agar refresh cache skema (tabel/relasi baru dari
+-- migrasi ini langsung dikenali tanpa perlu restart manual).
+NOTIFY pgrst, 'reload schema';

@@ -55,3 +55,7 @@ from public.selections s
 cross join public.profiles p
 where p.role = 'PANITIA_SELEKSI' and p.active = true
 on conflict (selection_id, user_id, member_role) do nothing;
+
+-- Beritahu PostgREST agar refresh cache skema (tabel/relasi baru dari
+-- migrasi ini langsung dikenali tanpa perlu restart manual).
+NOTIFY pgrst, 'reload schema';

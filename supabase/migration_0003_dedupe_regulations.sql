@@ -81,3 +81,7 @@ select kategori, lower(trim(nomor)) as nomor_normalized, tahun, count(*)
 from public.regulations
 group by kategori, lower(trim(nomor)), tahun
 having count(*) > 1;
+
+-- Beritahu PostgREST agar refresh cache skema (tabel/relasi baru dari
+-- migrasi ini langsung dikenali tanpa perlu restart manual).
+NOTIFY pgrst, 'reload schema';

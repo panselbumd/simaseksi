@@ -46,3 +46,7 @@ drop trigger if exists trg_audit_letters on public.letters;
 create trigger trg_audit_letters
   after insert on public.letters
   for each row execute function public.audit_trigger_generic();
+
+-- Beritahu PostgREST agar refresh cache skema (tabel/relasi baru dari
+-- migrasi ini langsung dikenali tanpa perlu restart manual).
+NOTIFY pgrst, 'reload schema';
