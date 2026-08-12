@@ -75,12 +75,14 @@ export default async function SelectionSuratPage({ params }: { params: Promise<{
                 </td>
                 <td className="px-4 py-3">
                   <div className="flex flex-wrap gap-2">
+                    {canManageLetters && l.status === "DRAFT" && (
+                      <a href={`/letters/${l.id}/edit`} className="text-xs bg-navy-900 text-white font-semibold rounded-md px-2.5 py-1 hover:bg-navy-800">✎ Edit</a>
+                    )}
                     <a href={`/letters/${l.id}/cetak`} target="_blank" rel="noreferrer" className="text-xs border border-gray-200 rounded-md px-2.5 py-1 hover:bg-gray-50">Lihat / Cetak</a>
                     <a href={`/letters/${l.id}/docx`} className="text-xs bg-navy-50 text-navy-800 font-semibold rounded-md px-2.5 py-1 hover:bg-navy-100">Unduh Word</a>
                     <a href={`/letters/${l.id}/pdf`} className="text-xs bg-navy-50 text-navy-800 font-semibold rounded-md px-2.5 py-1 hover:bg-navy-100">Unduh PDF</a>
                     {canManageLetters && l.status === "DRAFT" && (
                       <>
-                        <a href={`/letters/${l.id}/edit`} className="text-xs border border-navy-200 text-navy-700 font-semibold rounded-md px-2.5 py-1 hover:bg-navy-50">Edit</a>
                         <form action={finalizeLetterAction.bind(null, l.id)}>
                           <button className="text-xs bg-green-600 text-white font-semibold rounded-md px-2.5 py-1">Finalisasi</button>
                         </form>

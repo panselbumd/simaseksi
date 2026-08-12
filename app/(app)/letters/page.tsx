@@ -49,9 +49,16 @@ export default async function LettersPage({ searchParams }: { searchParams?: Pro
 
     const { data: letters, error: lettersErr } = await supabase
       .from("letters")
-      .select("id, nama_surat, nomor, tanggal, status, created_at, selections(nama)")
+      .select("id, nama_surat, nomor, tanggal, status, created_at, selection_id")
       .order("created_at", { ascending: false });
     if (lettersErr) throw new Error(`Gagal memuat daftar draf surat: ${lettersErr.message}`);
+    // Joined manually in JS rather than via a PostgREST embed
+    // (`selections(nama)`) — embeds depend on PostgREST having already
+    // detected the letters -> selections foreign key in its own schema
+    // cache, which (as we've seen) can lag behind the actual database
+    // state when tables are created outside Supabase's own migration
+    // tooling. A plain map by id has no such dependency.
+    const selectionNameById = new Map(selections.map((s) => [s.id, s.nama]));
 
     return (
       <div>
@@ -93,7 +100,7 @@ export default async function LettersPage({ searchParams }: { searchParams?: Pro
               {letters?.map((l: any) => (
                 <tr key={l.id} className="border-t border-gray-100 align-top">
                   <td className="px-4 py-3 font-medium">{l.nama_surat}</td>
-                  <td className="px-4 py-3">{l.selections?.nama}</td>
+                  <td className="px-4 py-3">{selectionNameById.get(l.selection_id) || "-"}</td>
                   <td className="px-4 py-3">{l.nomor}</td>
                   <td className="px-4 py-3">{l.tanggal ? new Date(l.tanggal).toLocaleDateString("id-ID") : "-"}</td>
                   <td className="px-4 py-3">
@@ -103,12 +110,14 @@ export default async function LettersPage({ searchParams }: { searchParams?: Pro
                   </td>
                   <td className="px-4 py-3">
                     <div className="flex flex-wrap gap-2">
+                      {role === "PANITIA_SELEKSI" && l.status === "DRAFT" && (
+                        <a href={`/letters/${l.id}/edit`} className="text-xs bg-navy-900 text-white font-semibold rounded-md px-2.5 py-1 hover:bg-navy-800">✎ Edit</a>
+                      )}
                       <a href={`/letters/${l.id}/cetak`} target="_blank" rel="noreferrer" className="text-xs border border-gray-200 rounded-md px-2.5 py-1 hover:bg-gray-50">Lihat / Cetak</a>
                       <a href={`/letters/${l.id}/docx`} className="text-xs bg-navy-50 text-navy-800 font-semibold rounded-md px-2.5 py-1 hover:bg-navy-100">Unduh Word</a>
                       <a href={`/letters/${l.id}/pdf`} className="text-xs bg-navy-50 text-navy-800 font-semibold rounded-md px-2.5 py-1 hover:bg-navy-100">Unduh PDF</a>
                       {role === "PANITIA_SELEKSI" && l.status === "DRAFT" && (
                         <>
-                          <a href={`/letters/${l.id}/edit`} className="text-xs border border-navy-200 text-navy-700 font-semibold rounded-md px-2.5 py-1 hover:bg-navy-50">Edit</a>
                           <form action={finalizeLetterAction.bind(null, l.id)}>
                             <button className="text-xs bg-green-600 text-white font-semibold rounded-md px-2.5 py-1">Finalisasi</button>
                           </form>

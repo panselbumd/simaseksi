@@ -1,5 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
-import { createAnnouncementAction, setAnnouncementStatusAction, deleteAnnouncementAction } from "./actions";
+import { createAnnouncementAction, updateAnnouncementAction, setAnnouncementStatusAction, deleteAnnouncementAction } from "./actions";
 import { hasPermission, type AppRole } from "@/lib/rbac";
 
 const STATUS_LABEL: Record<string, string> = { DRAFT: "Draf", SCHEDULED: "Terjadwal", PUBLISHED: "Dipublikasikan", ARCHIVED: "Diarsipkan" };
@@ -77,7 +77,49 @@ export default async function AnnouncementPage() {
             {a.publish_date && <div className="text-[11px] text-ink-400">{new Date(a.publish_date).toLocaleDateString("id-ID")}</div>}
 
             {canManage && (
-              <div className="flex gap-2 mt-3">
+              <div className="flex gap-2 mt-3 items-center">
+                <details className="group">
+                  <summary className="text-xs border border-navy-200 text-navy-700 font-semibold rounded-md px-3 py-1.5 cursor-pointer list-none inline-block select-none">
+                    Edit
+                  </summary>
+                  <form action={updateAnnouncementAction.bind(null, a.id)} className="mt-3 grid grid-cols-4 gap-3 bg-navy-50 border border-navy-100 rounded-md p-4">
+                    <div className="col-span-2">
+                      <label className="block text-xs font-semibold mb-1">Judul</label>
+                      <input name="title" defaultValue={a.title} required className="w-full border border-gray-200 rounded-md px-2.5 py-1.5 text-sm bg-white" />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-semibold mb-1">Kategori</label>
+                      <input name="category" defaultValue={a.category || ""} className="w-full border border-gray-200 rounded-md px-2.5 py-1.5 text-sm bg-white" />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-semibold mb-1">Tanggal Publikasi</label>
+                      <input name="publish_date" type="date" defaultValue={a.publish_date || ""} className="w-full border border-gray-200 rounded-md px-2.5 py-1.5 text-sm bg-white" />
+                    </div>
+                    <div className="col-span-3">
+                      <label className="block text-xs font-semibold mb-1">Terkait Seleksi</label>
+                      <select name="selection_id" defaultValue={a.selection_id || ""} className="w-full border border-gray-200 rounded-md px-2.5 py-1.5 text-sm bg-white">
+                        <option value="">Umum (tidak terkait seleksi tertentu)</option>
+                        {selections?.map((s) => <option key={s.id} value={s.id}>{s.nama}</option>)}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-xs font-semibold mb-1">Status</label>
+                      <select name="status" defaultValue={a.status} className="w-full border border-gray-200 rounded-md px-2.5 py-1.5 text-sm bg-white">
+                        <option value="DRAFT">Draf</option>
+                        <option value="SCHEDULED">Terjadwal</option>
+                        <option value="PUBLISHED">Dipublikasikan</option>
+                        <option value="ARCHIVED">Diarsipkan</option>
+                      </select>
+                    </div>
+                    <div className="col-span-4">
+                      <label className="block text-xs font-semibold mb-1">Isi Pengumuman</label>
+                      <textarea name="content" defaultValue={a.content} required rows={3} className="w-full border border-gray-200 rounded-md px-2.5 py-1.5 text-sm bg-white" />
+                    </div>
+                    <div className="col-span-4">
+                      <button type="submit" className="bg-navy-900 text-white text-sm font-semibold rounded-md px-4 py-2">Simpan Perubahan</button>
+                    </div>
+                  </form>
+                </details>
                 {a.status !== "PUBLISHED" && (
                   <form action={setAnnouncementStatusAction.bind(null, a.id, "PUBLISHED")}>
                     <button className="text-xs bg-green-600 text-white font-semibold rounded-md px-3 py-1.5">Publikasikan</button>
