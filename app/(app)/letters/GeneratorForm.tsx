@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { LETTER_TEMPLATES, fillTemplate, fmtTanggalPanjang } from "@/lib/letter-templates";
+import { LETTER_TEMPLATES, fillTemplate, fmtTanggalPanjang, letterHeaderFor, splitParagraphs } from "@/lib/letter-templates";
 import { createLetterAction } from "./actions";
 
 type SelectionOption = {
@@ -45,7 +45,7 @@ export default function GeneratorForm({ selections, initialSelectionId }: { sele
       PANITIA: panitia,
       TIM_UKK: "Tim Uji Kompetensi dan Kelayakan",
     };
-    return { body: fillTemplate(tpl.template, data), panitia, data };
+    return { body: fillTemplate(tpl.template, data), panitia, data, header: letterHeaderFor(tpl, data) };
   }, [sel, tpl, nomor, tanggal, namaPeserta, periode]);
 
   async function handleSubmit(formData: FormData) {
@@ -123,14 +123,43 @@ export default function GeneratorForm({ selections, initialSelectionId }: { sele
               {sel.kop_url && <img src={sel.kop_url} alt={`Kop Surat ${sel.bumd_nama}`} className="w-full h-auto" />}
             </div>
             <div className="mb-4" />{/* jarak kop ke isi surat: 1.5 spasi */}
-            <p className="text-right mb-4">Kota Batu, {preview.data.TANGGAL}</p>
-            <p className="mb-1">Nomor  : {preview.data.NOMOR}</p>
-            <p className="mb-4">Perihal : {tpl.nama}</p>
-            <p>{preview.body}</p>
+            {preview.header ? (
+              <div className="text-center mb-6">
+                <div className="font-bold underline uppercase">{preview.header.judul}</div>
+                <div>NOMOR: {preview.data.NOMOR}</div>
+                {preview.header.tentang && (
+                  <>
+                    <div className="mt-1">TENTANG</div>
+                    <div className="font-bold uppercase">{preview.header.tentang}</div>
+                  </>
+                )}
+              </div>
+            ) : (
+              <>
+                <p className="text-right mb-4">Kota Batu, {preview.data.TANGGAL}</p>
+                <p className="mb-1">Nomor  : {preview.data.NOMOR}</p>
+                <p className="mb-4">Perihal : {tpl.nama}</p>
+              </>
+            )}
+            {splitParagraphs(preview.body).map((para, i) => (
+              <p key={i} className="mb-4" style={{ whiteSpace: "pre-line" }}>{para}</p>
+            ))}
+            {preview.header && (
+              <p className="mb-4" style={{ whiteSpace: "pre-line" }}>{`Ditetapkan di Kota Batu\npada tanggal ${preview.data.TANGGAL}`}</p>
+            )}
             <div className="mt-8" style={{ marginLeft: "55%", width: "45%", textAlign: "left" }}>
-              <p>{preview.panitia},</p>
-              <p className="mt-14 font-bold underline">( ................................................ )</p>
-              <p>Ketua Panitia Seleksi</p>
+              {tpl.signatureRole === "peserta" ? (
+                <>
+                  <p>Yang membuat pernyataan,</p>
+                  <p className="mt-14 font-bold underline">( {preview.data.NAMA_PESERTA} )</p>
+                </>
+              ) : (
+                <>
+                  <p>{preview.panitia},</p>
+                  <p className="mt-14 font-bold underline">( ................................................ )</p>
+                  <p>Ketua Panitia Seleksi</p>
+                </>
+              )}
             </div>
           </div>
         ) : (

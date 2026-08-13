@@ -9,7 +9,7 @@ import {
   PAGE_MARGIN_TWIP, FONT_FAMILY, FONT_SIZE_HALF_PT, LINE_SPACING_DOCX,
   kopBannerAssetFor, kopBannerAspectRatioFor,
 } from "@/lib/letter-format";
-import { fmtTanggalPanjang } from "@/lib/letter-templates";
+import { findTemplate, letterDataFrom, letterHeaderFor, splitParagraphs } from "@/lib/letter-templates";
 
 const NO_BORDER = { style: BorderStyle.NONE, size: 0, color: "FFFFFF" } as const;
 
@@ -28,7 +28,12 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
 
   const bumd = (letter as any).selections?.bumds;
   const bumdNama: string = bumd?.nama || "-";
-  const panitiaLabel = `Panitia Seleksi ${letter.jabatan ?? ""} ${bumdNama}`.trim();
+
+  const tpl = findTemplate(letter.jenis_surat);
+  const data = letterDataFrom(letter, bumdNama);
+  const header = tpl ? letterHeaderFor(tpl, data) : null;
+  const paragraphs = splitParagraphs(letter.isi || "");
+  const signatureRole = tpl?.signatureRole ?? "panitia";
 
   // Always the bundled official letterhead banner, read straight off disk
   // (see lib/letter-format.ts for why we don't read bumds.kop_image_path /
@@ -43,6 +48,24 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
   const spacing = { line: LINE_SPACING_DOCX, lineRule: "auto" as const };
   const run = (text: string, opts: Record<string, unknown> = {}) =>
     new TextRun({ text, font: FONT_FAMILY, size: FONT_SIZE_HALF_PT, ...opts });
+
+  // A block of text with single \n hard line breaks (e.g. the
+  // Hari/Tanggal/Waktu/Tempat block in Undangan) becomes ONE Paragraph
+  // with explicit line-break runs between each line, so it stays visually
+  // together without the extra spacing a new Paragraph would add.
+  function bodyParagraph(block: string, opts: { justify?: boolean; bold?: boolean } = {}) {
+    const lines = block.split("\n");
+    const children: TextRun[] = [];
+    lines.forEach((line, i) => {
+      if (i > 0) children.push(new TextRun({ break: 1 }));
+      children.push(run(line, opts.bold ? { bold: true } : {}));
+    });
+    return new Paragraph({
+      alignment: opts.justify ? AlignmentType.JUSTIFIED : undefined,
+      spacing,
+      children,
+    });
+  }
 
   // Page text width = A4 (21cm) minus left/right margins, converted cm -> px
   // at 96dpi for the ImageRun transformation.
@@ -64,16 +87,59 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
     new Paragraph({ spacing, children: [run("")] }),
   );
 
+  const headerParagraphs: Paragraph[] = header
+    ? [
+        new Paragraph({ alignment: AlignmentType.CENTER, spacing, children: [run(header.judul, { bold: true, underline: {} })] }),
+        new Paragraph({ alignment: AlignmentType.CENTER, spacing, children: [run(`NOMOR: ${letter.nomor}`)] }),
+        ...(header.tentang
+          ? [
+              new Paragraph({ alignment: AlignmentType.CENTER, spacing, children: [run("TENTANG")] }),
+              new Paragraph({ alignment: AlignmentType.CENTER, spacing, children: [run(header.tentang, { bold: true })] }),
+            ]
+          : []),
+        new Paragraph({ spacing, children: [run("")] }),
+      ]
+    : [
+        new Paragraph({ alignment: AlignmentType.RIGHT, spacing, children: [run(`Kota Batu, ${data.TANGGAL}`)] }),
+        new Paragraph({ spacing, children: [run(`Nomor  : ${letter.nomor}`)] }),
+        new Paragraph({ spacing, children: [run(`Perihal : ${letter.nama_surat}`)] }),
+        new Paragraph({ spacing, children: [run("")] }),
+      ];
+
+  const bodyParagraphs = paragraphs.map((p) => bodyParagraph(p, { justify: true }));
+
+  const closingParagraphs: Paragraph[] = header
+    ? [
+        new Paragraph({ spacing, children: [run("")] }),
+        bodyParagraph(`Ditetapkan di Kota Batu\npada tanggal ${data.TANGGAL}`),
+      ]
+    : [];
+
+  const signatureCellChildren = signatureRole === "peserta"
+    ? [
+        new Paragraph({ alignment: AlignmentType.LEFT, spacing, children: [run("Yang membuat pernyataan,")] }),
+        new Paragraph({ children: [run("")] }),
+        new Paragraph({ children: [run("")] }),
+        new Paragraph({ children: [run("")] }),
+        new Paragraph({ alignment: AlignmentType.LEFT, children: [run(`( ${data.NAMA_PESERTA} )`, { bold: true, underline: {} })] }),
+      ]
+    : [
+        new Paragraph({ alignment: AlignmentType.LEFT, spacing, children: [run(`${data.PANITIA},`)] }),
+        new Paragraph({ children: [run("")] }),
+        new Paragraph({ children: [run("")] }),
+        new Paragraph({ children: [run("")] }),
+        new Paragraph({ alignment: AlignmentType.LEFT, children: [run("( ................................................ )", { bold: true, underline: {} })] }),
+        new Paragraph({ alignment: AlignmentType.LEFT, children: [run("Ketua Panitia Seleksi")] }),
+      ];
+
   const doc = new Document({
     sections: [{
       properties: { page: { margin: PAGE_MARGIN_TWIP } },
       children: [
         ...kopParagraphs,
-        new Paragraph({ alignment: AlignmentType.RIGHT, spacing, children: [run(`Kota Batu, ${fmtTanggalPanjang(letter.tanggal)}`)] }),
-        new Paragraph({ spacing, children: [run(`Nomor  : ${letter.nomor}`)] }),
-        new Paragraph({ spacing, children: [run(`Perihal : ${letter.nama_surat}`)] }),
-        new Paragraph({ spacing, children: [run("")] }),
-        new Paragraph({ alignment: AlignmentType.JUSTIFIED, spacing, children: [run(letter.isi)] }),
+        ...headerParagraphs,
+        ...bodyParagraphs,
+        ...closingParagraphs,
         new Paragraph({ spacing, children: [run("")] }),
         new Paragraph({ spacing, children: [run("")] }),
         // Blok tanda tangan: sisi kanan halaman, teks di dalam blok rata kiri.
@@ -83,17 +149,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
           rows: [new TableRow({
             children: [
               new TableCell({ width: { size: 55, type: WidthType.PERCENTAGE }, children: [new Paragraph({ children: [run("")] })] }),
-              new TableCell({
-                width: { size: 45, type: WidthType.PERCENTAGE },
-                children: [
-                  new Paragraph({ alignment: AlignmentType.LEFT, spacing, children: [run(`${panitiaLabel},`)] }),
-                  new Paragraph({ children: [run("")] }),
-                  new Paragraph({ children: [run("")] }),
-                  new Paragraph({ children: [run("")] }),
-                  new Paragraph({ alignment: AlignmentType.LEFT, children: [run("( ................................................ )", { bold: true, underline: {} })] }),
-                  new Paragraph({ alignment: AlignmentType.LEFT, children: [run("Ketua Panitia Seleksi")] }),
-                ],
-              }),
+              new TableCell({ width: { size: 45, type: WidthType.PERCENTAGE }, children: signatureCellChildren }),
             ],
           })],
         }),

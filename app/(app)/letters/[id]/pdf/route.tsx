@@ -4,7 +4,7 @@ import path from "node:path";
 import { Document, Page, Text, View, Image, StyleSheet, Font, renderToBuffer } from "@react-pdf/renderer";
 import { createClient } from "@/lib/supabase/server";
 import { PAGE_MARGIN_CM, kopBannerAssetFor } from "@/lib/letter-format";
-import { fmtTanggalPanjang } from "@/lib/letter-templates";
+import { findTemplate, letterDataFrom, letterHeaderFor, splitParagraphs } from "@/lib/letter-templates";
 
 // Arial itself can't be bundled (proprietary), so we register Arimo — a
 // metrically-compatible, open-license substitute purpose-built to match
@@ -44,7 +44,10 @@ function makeStyles(fontFamily: string) {
     kopImg: { width: "100%" },
     spacerLine: { marginBottom: 16 }, // ~1.5 line-height gap between kop & body
     right: { textAlign: "right", marginBottom: 12 },
-    justify: { textAlign: "justify" },
+    justify: { textAlign: "justify", marginBottom: 10 },
+    judulBlok: { textAlign: "center", marginBottom: 16 },
+    judul: { fontWeight: 700, textDecoration: "underline" },
+    tentang: { fontWeight: 700 },
     signatureBlock: { marginTop: 30, marginLeft: "55%", width: "45%" },
   });
 }
@@ -64,7 +67,12 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
 
   const bumd = (letter as any).selections?.bumds;
   const bumdNama: string = bumd?.nama || "-";
-  const panitiaLabel = `Panitia Seleksi ${letter.jabatan ?? ""} ${bumdNama}`.trim();
+
+  const tpl = findTemplate(letter.jenis_surat);
+  const data = letterDataFrom(letter, bumdNama);
+  const header = tpl ? letterHeaderFor(tpl, data) : null;
+  const paragraphs = splitParagraphs(letter.isi || "");
+  const signatureRole = tpl?.signatureRole ?? "panitia";
 
   // Always the bundled official letterhead banner, read straight off disk
   // (no network round-trip; see lib/letter-format.ts for why we don't read
@@ -88,14 +96,43 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
           {kopImageSrc && <Image src={kopImageSrc} style={styles.kopImg} />}
         </View>
         <View style={styles.spacerLine} />
-        <Text style={styles.right}>Kota Batu, {fmtTanggalPanjang(letter.tanggal)}</Text>
-        <Text>Nomor  : {letter.nomor}</Text>
-        <Text style={{ marginBottom: 14 }}>Perihal : {letter.nama_surat}</Text>
-        <Text style={styles.justify}>{letter.isi}</Text>
+
+        {header ? (
+          <View style={styles.judulBlok}>
+            <Text style={styles.judul}>{header.judul}</Text>
+            <Text>NOMOR: {letter.nomor}</Text>
+            {header.tentang && (
+              <>
+                <Text>TENTANG</Text>
+                <Text style={styles.tentang}>{header.tentang}</Text>
+              </>
+            )}
+          </View>
+        ) : (
+          <>
+            <Text style={styles.right}>Kota Batu, {data.TANGGAL}</Text>
+            <Text>Nomor  : {letter.nomor}</Text>
+            <Text style={{ marginBottom: 14 }}>Perihal : {letter.nama_surat}</Text>
+          </>
+        )}
+
+        {paragraphs.map((para, i) => <Text key={i} style={styles.justify}>{para}</Text>)}
+
+        {header && <Text style={{ marginBottom: 10 }}>{`Ditetapkan di Kota Batu\npada tanggal ${data.TANGGAL}`}</Text>}
+
         <View style={styles.signatureBlock}>
-          <Text>{panitiaLabel},</Text>
-          <Text style={{ marginTop: 55, fontWeight: 700, textDecoration: "underline" }}>( ................................................ )</Text>
-          <Text>Ketua Panitia Seleksi</Text>
+          {signatureRole === "peserta" ? (
+            <>
+              <Text>Yang membuat pernyataan,</Text>
+              <Text style={{ marginTop: 55, fontWeight: 700, textDecoration: "underline" }}>( {data.NAMA_PESERTA} )</Text>
+            </>
+          ) : (
+            <>
+              <Text>{data.PANITIA},</Text>
+              <Text style={{ marginTop: 55, fontWeight: 700, textDecoration: "underline" }}>( ................................................ )</Text>
+              <Text>Ketua Panitia Seleksi</Text>
+            </>
+          )}
         </View>
       </Page>
     </Document>
