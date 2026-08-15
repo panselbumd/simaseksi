@@ -2,7 +2,11 @@
 
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { LETTER_TEMPLATES, LETTER_CATEGORIES, fillTemplate, fmtTanggalPanjang, letterHeaderFor, splitParagraphs } from "@/lib/letter-templates";
+import {
+  LETTER_TEMPLATES, LETTER_CATEGORIES, CUSTOM_TEMPLATE_ID,
+  fillTemplate, fmtTanggalPanjang, letterHeaderFor, splitParagraphs,
+  type LetterTemplate, type LetterLayout, type SignatureSpec,
+} from "@/lib/letter-templates";
 import { signerNameOr, signerNipLine, type SignatureData } from "@/lib/letter-signature";
 import { updateLetterAction } from "../../actions";
 
@@ -13,6 +17,19 @@ type LetterDraft = {
   tanggal: string;
   nama_peserta: string;
   periode: string;
+  isi: string;
+  nama_surat: string;
+  custom_judul: string;
+  custom_tentang: string;
+  custom_layout: LetterLayout;
+  custom_signature: SignatureSpec["kind"];
+};
+
+const SIGNATURE_LABEL: Record<SignatureSpec["kind"], string> = {
+  single: "Ketua Panitia Seleksi saja",
+  table5: "Tabel 5 orang (Ketua/Sekretaris/Anggota×3) tanda tangan individual",
+  block3: "Blok 3 kolom: Ketua / Sekretaris / Anggota",
+  peserta: "Peserta/Calon yang menandatangani",
 };
 
 export default function EditLetterForm({
@@ -24,15 +41,37 @@ export default function EditLetterForm({
   const [tanggal, setTanggal] = useState(letter.tanggal);
   const [namaPeserta, setNamaPeserta] = useState(letter.nama_peserta);
   const [periode, setPeriode] = useState(letter.periode);
+  const [isi, setIsi] = useState(letter.isi);
+
+  const [namaSurat, setNamaSurat] = useState(letter.jenis_surat === CUSTOM_TEMPLATE_ID ? letter.nama_surat : "");
+  const [customJudul, setCustomJudul] = useState(letter.custom_judul);
+  const [customTentang, setCustomTentang] = useState(letter.custom_tentang);
+  const [customLayout, setCustomLayout] = useState<LetterLayout>(letter.custom_layout);
+  const [customSignature, setCustomSignature] = useState<SignatureSpec["kind"]>(letter.custom_signature);
+
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState<{ type: "ok" | "error"; text: string } | null>(null);
 
-  const tpl = LETTER_TEMPLATES.find((t) => t.id === jenisId) ?? LETTER_TEMPLATES[0];
+  const isCustom = jenisId === CUSTOM_TEMPLATE_ID;
   const sig = signature;
 
-  const preview = useMemo(() => {
+  const tpl: LetterTemplate = useMemo(() => {
+    if (!isCustom) return LETTER_TEMPLATES.find((t) => t.id === jenisId) ?? LETTER_TEMPLATES[0];
+    return {
+      id: CUSTOM_TEMPLATE_ID,
+      nama: namaSurat || letter.nama_surat || "Naskah Kustom",
+      kategori: "Kustom",
+      layout: customLayout,
+      judulDinas: customJudul || (namaSurat ? namaSurat.toUpperCase() : "NASKAH DINAS"),
+      tentang: customTentang || undefined,
+      signature: { kind: customSignature },
+      template: "",
+    };
+  }, [isCustom, jenisId, namaSurat, customJudul, customTentang, customLayout, customSignature, letter.nama_surat]);
+
+  const computedData = useMemo(() => {
     const panitia = `Panitia Seleksi ${jabatan} ${bumdNama}`;
-    const data: Record<string, string> = {
+    return {
       NOMOR: nomor.trim() || "—/—/2026",
       TANGGAL: fmtTanggalPanjang(tanggal),
       BUMD: bumdNama,
@@ -43,8 +82,15 @@ export default function EditLetterForm({
       PANITIA: panitia,
       TIM_UKK: "Tim Uji Kompetensi dan Kelayakan",
     };
-    return { body: fillTemplate(tpl.template, data), panitia, data, header: letterHeaderFor(tpl, data) };
-  }, [tpl, nomor, tanggal, namaPeserta, periode, jabatan, bumdNama, dasarHukum]);
+  }, [nomor, tanggal, namaPeserta, periode, jabatan, bumdNama, dasarHukum]);
+
+  const header = letterHeaderFor(tpl, computedData);
+
+  function resetFromTemplate() {
+    if (isCustom) return;
+    const fresh = LETTER_TEMPLATES.find((t) => t.id === jenisId);
+    if (fresh) setIsi(fillTemplate(fresh.template, computedData));
+  }
 
   async function handleSubmit(formData: FormData) {
     setSaving(true);
@@ -61,11 +107,14 @@ export default function EditLetterForm({
   }
 
   return (
-    <div className="grid gap-6" style={{ gridTemplateColumns: "340px 1fr" }}>
+    <div className="grid gap-6" style={{ gridTemplateColumns: "380px 1fr" }}>
       <form action={handleSubmit} className="bg-white border border-gray-200 rounded-md p-5 space-y-3 h-fit">
         <div>
           <label className="block text-xs font-semibold mb-1">Jenis Surat</label>
           <select name="jenis_surat" value={jenisId} onChange={(e) => setJenisId(e.target.value)} className="w-full border border-gray-200 rounded-md px-2.5 py-1.5 text-sm">
+            <optgroup label="Kustom">
+              <option value={CUSTOM_TEMPLATE_ID}>✎ Naskah Dinas Kustom (isi &amp; format sendiri)</option>
+            </optgroup>
             {LETTER_CATEGORIES.map((kategori) => (
               <optgroup key={kategori} label={kategori}>
                 {LETTER_TEMPLATES.filter((t) => t.kategori === kategori).map((t) => (
@@ -75,6 +124,43 @@ export default function EditLetterForm({
             ))}
           </select>
         </div>
+
+        {isCustom && (
+          <div className="border border-dashed border-navy-200 rounded-md p-3 space-y-3 bg-navy-50/40">
+            <div>
+              <label className="block text-xs font-semibold mb-1">Judul/Nama Naskah</label>
+              <input name="nama_surat" value={namaSurat} onChange={(e) => setNamaSurat(e.target.value)} className="w-full border border-gray-200 rounded-md px-2.5 py-1.5 text-sm" required />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold mb-1">Bentuk Naskah</label>
+              <select name="custom_layout" value={customLayout} onChange={(e) => setCustomLayout(e.target.value as LetterLayout)} className="w-full border border-gray-200 rounded-md px-2.5 py-1.5 text-sm">
+                <option value="korespondensi">Surat biasa (Nomor/Perihal, ditujukan ke pihak tertentu)</option>
+                <option value="judul">Judul di tengah (mis. gaya Berita Acara/Pengumuman)</option>
+              </select>
+            </div>
+            {customLayout === "judul" && (
+              <>
+                <div>
+                  <label className="block text-xs font-semibold mb-1">Judul Dinas (baris judul di tengah)</label>
+                  <input name="custom_judul" value={customJudul} onChange={(e) => setCustomJudul(e.target.value)} className="w-full border border-gray-200 rounded-md px-2.5 py-1.5 text-sm" />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold mb-1">Tentang (opsional)</label>
+                  <input name="custom_tentang" value={customTentang} onChange={(e) => setCustomTentang(e.target.value)} className="w-full border border-gray-200 rounded-md px-2.5 py-1.5 text-sm" />
+                </div>
+              </>
+            )}
+            <div>
+              <label className="block text-xs font-semibold mb-1">Bentuk Tanda Tangan</label>
+              <select name="custom_signature" value={customSignature} onChange={(e) => setCustomSignature(e.target.value as SignatureSpec["kind"])} className="w-full border border-gray-200 rounded-md px-2.5 py-1.5 text-sm">
+                {(Object.keys(SIGNATURE_LABEL) as SignatureSpec["kind"][]).map((k) => (
+                  <option key={k} value={k}>{SIGNATURE_LABEL[k]}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+        )}
+
         <div>
           <label className="block text-xs font-semibold mb-1">Nomor Surat</label>
           <input name="nomor" value={nomor} onChange={(e) => setNomor(e.target.value)} className="w-full border border-gray-200 rounded-md px-2.5 py-1.5 text-sm" required />
@@ -91,6 +177,23 @@ export default function EditLetterForm({
           <label className="block text-xs font-semibold mb-1">Periode</label>
           <input name="periode" value={periode} onChange={(e) => setPeriode(e.target.value)} className="w-full border border-gray-200 rounded-md px-2.5 py-1.5 text-sm" />
         </div>
+
+        <div>
+          <div className="flex items-center justify-between mb-1">
+            <label className="block text-xs font-semibold">Isi Naskah (redaksi — bisa diedit bebas)</label>
+            {!isCustom && (
+              <button type="button" onClick={resetFromTemplate} className="text-[11px] text-navy-700 underline hover:text-navy-900">
+                ↻ Isi ulang dari template
+              </button>
+            )}
+          </div>
+          <textarea
+            name="isi" value={isi} onChange={(e) => setIsi(e.target.value)} rows={16} required
+            className="w-full border border-gray-200 rounded-md px-2.5 py-1.5 text-xs font-mono leading-relaxed"
+          />
+          <p className="text-[11px] text-ink-500 mt-1">Baris kosong ganda memisahkan paragraf.</p>
+        </div>
+
         <button type="submit" disabled={saving} className="w-full bg-navy-900 text-white text-sm font-semibold rounded-md px-4 py-2 disabled:opacity-50">
           {saving ? "Menyimpan..." : "Simpan Perubahan"}
         </button>
@@ -110,39 +213,39 @@ export default function EditLetterForm({
           <img src={kopUrl} alt={`Kop Surat ${bumdNama}`} className="w-full h-auto" />
         </div>
         <div className="mb-4" />
-        {preview.header ? (
+        {header ? (
           <div className="text-center mb-6">
-            <div className="font-bold underline uppercase">{preview.header.judul}</div>
-            <div>NOMOR: {preview.data.NOMOR}</div>
-            {preview.header.tentang && (
+            <div className="font-bold underline uppercase">{header.judul}</div>
+            <div>NOMOR: {computedData.NOMOR}</div>
+            {header.tentang && (
               <>
                 <div className="mt-1">TENTANG</div>
-                <div className="font-bold uppercase">{preview.header.tentang}</div>
+                <div className="font-bold uppercase">{header.tentang}</div>
               </>
             )}
           </div>
         ) : (
           <>
-            <p className="text-right mb-4">Kota Batu, {preview.data.TANGGAL}</p>
-            <p className="mb-1">Nomor  : {preview.data.NOMOR}</p>
+            <p className="text-right mb-4">Kota Batu, {computedData.TANGGAL}</p>
+            <p className="mb-1">Nomor  : {computedData.NOMOR}</p>
             <p className="mb-4">Perihal : {tpl.nama}</p>
           </>
         )}
-        {splitParagraphs(preview.body).map((para, i) => (
+        {splitParagraphs(isi).map((para, i) => (
           <p key={i} className="mb-4" style={{ whiteSpace: "pre-line" }}>{para}</p>
         ))}
-        {preview.header && (
-          <p className="mb-4" style={{ whiteSpace: "pre-line" }}>{`Ditetapkan di Kota Batu\npada tanggal ${preview.data.TANGGAL}`}</p>
+        {header && (
+          <p className="mb-4" style={{ whiteSpace: "pre-line" }}>{`Ditetapkan di Kota Batu\npada tanggal ${computedData.TANGGAL}`}</p>
         )}
         {tpl.signature.kind === "peserta" && (
           <div className="mt-8" style={{ marginLeft: "55%", width: "45%", textAlign: "left" }}>
             <p>Yang membuat pernyataan,</p>
-            <p className="mt-14 font-bold underline">( {preview.data.NAMA_PESERTA} )</p>
+            <p className="mt-14 font-bold underline">( {computedData.NAMA_PESERTA} )</p>
           </div>
         )}
         {tpl.signature.kind === "single" && (
           <div className="mt-8" style={{ marginLeft: "55%", width: "45%", textAlign: "left" }}>
-            <p>{preview.panitia},</p>
+            <p>{computedData.PANITIA},</p>
             <p className="mt-14 font-bold underline">( {signerNameOr(sig.ketua)} )</p>
             <p>Ketua Panitia Seleksi</p>
             <p>{signerNipLine(sig.ketua)}</p>

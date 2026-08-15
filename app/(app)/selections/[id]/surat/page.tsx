@@ -3,6 +3,8 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { hasPermission, type AppRole } from "@/lib/rbac";
 import { finalizeLetterAction, deleteLetterAction } from "@/app/(app)/letters/actions";
+import { createAttendanceSheetAction, deleteAttendanceSheetAction } from "@/app/(app)/daftar-hadir/actions";
+import { fmtTanggalPanjang } from "@/lib/letter-templates";
 
 // "Cetak/Unduh Surat" from Manajemen Seleksi opens here — a view scoped to
 // this one selection's own letters, without leaving the Selections module
@@ -28,6 +30,12 @@ export default async function SelectionSuratPage({ params }: { params: Promise<{
   const { data: letters } = await supabase
     .from("letters")
     .select("id, nama_surat, nomor, tanggal, status")
+    .eq("selection_id", id)
+    .order("created_at", { ascending: false });
+
+  const { data: attendanceSheets } = await supabase
+    .from("attendance_sheets")
+    .select("id, judul_kegiatan, tanggal, tempat, baris_kosong")
     .eq("selection_id", id)
     .order("created_at", { ascending: false });
 
@@ -100,6 +108,71 @@ export default async function SelectionSuratPage({ params }: { params: Promise<{
                 Belum ada surat untuk seleksi ini.
                 {canManageLetters && <> Susun draf pertama lewat <Link href={`/letters?selection=${id}`} className="text-navy-700 underline">Generator Surat</Link>.</>}
               </td></tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+
+      <div className="flex items-center justify-between mt-10 mb-1">
+        <div>
+          <h2 className="text-lg font-display font-bold text-navy-900">Daftar Hadir</h2>
+          <p className="text-sm text-ink-500">Lampiran L-01 — dipakai untuk rapat/kegiatan seleksi apa pun (rapat persiapan, UKK, presentasi &amp; wawancara, dst).</p>
+        </div>
+      </div>
+
+      {canManageLetters && (
+        <form action={createAttendanceSheetAction} className="bg-white border border-gray-200 rounded-md p-5 mb-4 grid grid-cols-2 md:grid-cols-5 gap-3 items-end">
+          <input type="hidden" name="selection_id" value={id} />
+          <div className="md:col-span-2">
+            <label className="block text-xs font-semibold mb-1">Judul Kegiatan</label>
+            <input name="judul_kegiatan" required placeholder="mis. Pelaksanaan Uji Kelayakan dan Kepatutan (UKK)" className="w-full border border-gray-200 rounded-md px-2.5 py-1.5 text-sm" />
+          </div>
+          <div>
+            <label className="block text-xs font-semibold mb-1">Tanggal</label>
+            <input type="date" name="tanggal" required defaultValue={new Date().toISOString().slice(0, 10)} className="w-full border border-gray-200 rounded-md px-2.5 py-1.5 text-sm" />
+          </div>
+          <div>
+            <label className="block text-xs font-semibold mb-1">Tempat (opsional)</label>
+            <input name="tempat" placeholder="mis. Ruang Rapat Balai Kota" className="w-full border border-gray-200 rounded-md px-2.5 py-1.5 text-sm" />
+          </div>
+          <div>
+            <label className="block text-xs font-semibold mb-1">Baris Kosong Tambahan</label>
+            <input type="number" name="baris_kosong" min={0} max={40} defaultValue={10} className="w-full border border-gray-200 rounded-md px-2.5 py-1.5 text-sm" />
+          </div>
+          <button type="submit" className="md:col-span-5 justify-self-start bg-navy-900 text-white text-sm font-semibold rounded-md px-4 py-2">+ Buat Daftar Hadir</button>
+        </form>
+      )}
+
+      <div className="bg-white border border-gray-200 rounded-md overflow-hidden">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="bg-navy-50 text-left text-[11px] uppercase text-ink-700">
+              <th className="px-4 py-3">Kegiatan</th>
+              <th className="px-4 py-3">Tanggal</th>
+              <th className="px-4 py-3">Tempat</th>
+              <th className="px-4 py-3">Aksi</th>
+            </tr>
+          </thead>
+          <tbody>
+            {attendanceSheets?.map((sheetRow) => (
+              <tr key={sheetRow.id} className="border-t border-gray-100">
+                <td className="px-4 py-3 font-medium">{sheetRow.judul_kegiatan}</td>
+                <td className="px-4 py-3">{fmtTanggalPanjang(sheetRow.tanggal)}</td>
+                <td className="px-4 py-3">{sheetRow.tempat || "—"}</td>
+                <td className="px-4 py-3">
+                  <div className="flex flex-wrap gap-2">
+                    <a href={`/daftar-hadir/${sheetRow.id}`} target="_blank" rel="noreferrer" className="text-xs border border-gray-200 rounded-md px-2.5 py-1 hover:bg-gray-50">Lihat / Cetak</a>
+                    {canManageLetters && (
+                      <form action={deleteAttendanceSheetAction.bind(null, sheetRow.id, id)}>
+                        <button className="text-xs bg-red-50 text-red-700 font-semibold rounded-md px-2.5 py-1">Hapus</button>
+                      </form>
+                    )}
+                  </div>
+                </td>
+              </tr>
+            )) ?? null}
+            {(!attendanceSheets || attendanceSheets.length === 0) && (
+              <tr><td colSpan={4} className="px-4 py-8 text-center text-ink-500">Belum ada Daftar Hadir untuk seleksi ini.</td></tr>
             )}
           </tbody>
         </table>

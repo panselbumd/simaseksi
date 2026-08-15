@@ -1,8 +1,12 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { LETTER_TEMPLATES, LETTER_CATEGORIES, fillTemplate, fmtTanggalPanjang, letterHeaderFor, splitParagraphs } from "@/lib/letter-templates";
+import {
+  LETTER_TEMPLATES, LETTER_CATEGORIES, CUSTOM_TEMPLATE_ID,
+  fillTemplate, fmtTanggalPanjang, letterHeaderFor, splitParagraphs,
+  type LetterTemplate, type LetterLayout, type SignatureSpec,
+} from "@/lib/letter-templates";
 import { signerNameOr, signerNipLine, type SignatureData } from "@/lib/letter-signature";
 import { createLetterAction } from "./actions";
 
@@ -17,6 +21,13 @@ type SelectionOption = {
 };
 
 const EMPTY_SIGNATURE: SignatureData = { ketua: null, sekretaris: null, anggota: [], timUkk: [] };
+
+const SIGNATURE_LABEL: Record<SignatureSpec["kind"], string> = {
+  single: "Ketua Panitia Seleksi saja",
+  table5: "Tabel 5 orang (Ketua/Sekretaris/Anggota×3) tanda tangan individual",
+  block3: "Blok 3 kolom: Ketua / Sekretaris / Anggota",
+  peserta: "Peserta/Calon yang menandatangani",
+};
 
 export default function GeneratorForm({
   selections, initialSelectionId, signatureBySelection = {},
@@ -34,17 +45,29 @@ export default function GeneratorForm({
   const [tanggal, setTanggal] = useState(new Date().toISOString().slice(0, 10));
   const [namaPeserta, setNamaPeserta] = useState("");
   const [periode, setPeriode] = useState("2026-2031");
+
+  // Naskah Dinas Kustom — hanya relevan saat jenisId === CUSTOM_TEMPLATE_ID.
+  const [namaSurat, setNamaSurat] = useState("");
+  const [customJudul, setCustomJudul] = useState("");
+  const [customTentang, setCustomTentang] = useState("");
+  const [customLayout, setCustomLayout] = useState<LetterLayout>("korespondensi");
+  const [customSignature, setCustomSignature] = useState<SignatureSpec["kind"]>("single");
+
+  // Redaksi/isi naskah — sekarang bisa diedit bebas. Diisi otomatis dari
+  // template saat jenis surat dipilih/berganti; setelahnya sepenuhnya di
+  // tangan Panitia sampai ditekan "Isi ulang dari template".
+  const [isi, setIsi] = useState("");
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState<{ type: "ok" | "error"; text: string } | null>(null);
 
-  const tpl = LETTER_TEMPLATES.find((t) => t.id === jenisId)!;
+  const isCustom = jenisId === CUSTOM_TEMPLATE_ID;
   const sel = selections.find((s) => s.id === selectionId);
   const sig = signatureBySelection[selectionId] ?? EMPTY_SIGNATURE;
 
-  const preview = useMemo(() => {
+  const computedData = useMemo(() => {
     if (!sel) return null;
     const panitia = `Panitia Seleksi ${sel.jabatan} ${sel.bumd_nama}`;
-    const data: Record<string, string> = {
+    return {
       NOMOR: nomor.trim() || "—/—/2026",
       TANGGAL: fmtTanggalPanjang(tanggal),
       BUMD: sel.bumd_nama,
@@ -55,8 +78,38 @@ export default function GeneratorForm({
       PANITIA: panitia,
       TIM_UKK: "Tim Uji Kompetensi dan Kelayakan",
     };
-    return { body: fillTemplate(tpl.template, data), panitia, data, header: letterHeaderFor(tpl, data) };
-  }, [sel, tpl, nomor, tanggal, namaPeserta, periode]);
+  }, [sel, nomor, tanggal, namaPeserta, periode]);
+
+  const tpl: LetterTemplate = useMemo(() => {
+    if (!isCustom) return LETTER_TEMPLATES.find((t) => t.id === jenisId)!;
+    return {
+      id: CUSTOM_TEMPLATE_ID,
+      nama: namaSurat || "Naskah Kustom",
+      kategori: "Kustom",
+      layout: customLayout,
+      judulDinas: customJudul || (namaSurat ? namaSurat.toUpperCase() : "NASKAH DINAS"),
+      tentang: customTentang || undefined,
+      signature: { kind: customSignature },
+      template: "",
+    };
+  }, [isCustom, jenisId, namaSurat, customJudul, customTentang, customLayout, customSignature]);
+
+  const header = computedData ? letterHeaderFor(tpl, computedData) : null;
+
+  // Isi otomatis diisi ulang setiap kali jenis surat (template) diganti —
+  // bukan saat mengetik nomor/tanggal/dst, supaya suntingan tangan tidak
+  // hilang. Untuk Naskah Kustom, mulai dari kosong.
+  useEffect(() => {
+    if (isCustom) { setIsi(""); return; }
+    if (!computedData) return;
+    setIsi(fillTemplate(tpl.template, computedData));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [jenisId]);
+
+  function resetFromTemplate() {
+    if (isCustom || !computedData) return;
+    setIsi(fillTemplate(tpl.template, computedData));
+  }
 
   async function handleSubmit(formData: FormData) {
     setSaving(true);
@@ -79,12 +132,15 @@ export default function GeneratorForm({
   }
 
   return (
-    <div className="grid gap-6" style={{ gridTemplateColumns: "340px 1fr" }}>
+    <div className="grid gap-6" style={{ gridTemplateColumns: "380px 1fr" }}>
       <form action={handleSubmit} className="bg-white border border-gray-200 rounded-md p-5 space-y-3 h-fit">
         <div className="text-sm font-display font-bold text-navy-900 mb-1">+ Tambah Surat Baru</div>
         <div>
           <label className="block text-xs font-semibold mb-1">Jenis Surat</label>
           <select name="jenis_surat" value={jenisId} onChange={(e) => setJenisId(e.target.value)} className="w-full border border-gray-200 rounded-md px-2.5 py-1.5 text-sm">
+            <optgroup label="Kustom">
+              <option value={CUSTOM_TEMPLATE_ID}>✎ Naskah Dinas Kustom (isi &amp; format sendiri)</option>
+            </optgroup>
             {LETTER_CATEGORIES.map((kategori) => (
               <optgroup key={kategori} label={kategori}>
                 {LETTER_TEMPLATES.filter((t) => t.kategori === kategori).map((t) => (
@@ -94,6 +150,43 @@ export default function GeneratorForm({
             ))}
           </select>
         </div>
+
+        {isCustom && (
+          <div className="border border-dashed border-navy-200 rounded-md p-3 space-y-3 bg-navy-50/40">
+            <div>
+              <label className="block text-xs font-semibold mb-1">Judul/Nama Naskah</label>
+              <input name="nama_surat" value={namaSurat} onChange={(e) => setNamaSurat(e.target.value)} placeholder="mis. Surat Pemberitahuan Perpanjangan Jadwal" className="w-full border border-gray-200 rounded-md px-2.5 py-1.5 text-sm" required />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold mb-1">Bentuk Naskah</label>
+              <select name="custom_layout" value={customLayout} onChange={(e) => setCustomLayout(e.target.value as LetterLayout)} className="w-full border border-gray-200 rounded-md px-2.5 py-1.5 text-sm">
+                <option value="korespondensi">Surat biasa (Nomor/Perihal, ditujukan ke pihak tertentu)</option>
+                <option value="judul">Judul di tengah (mis. gaya Berita Acara/Pengumuman)</option>
+              </select>
+            </div>
+            {customLayout === "judul" && (
+              <>
+                <div>
+                  <label className="block text-xs font-semibold mb-1">Judul Dinas (baris judul di tengah)</label>
+                  <input name="custom_judul" value={customJudul} onChange={(e) => setCustomJudul(e.target.value)} placeholder={namaSurat ? namaSurat.toUpperCase() : "mis. SURAT KETERANGAN"} className="w-full border border-gray-200 rounded-md px-2.5 py-1.5 text-sm" />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold mb-1">Tentang (opsional)</label>
+                  <input name="custom_tentang" value={customTentang} onChange={(e) => setCustomTentang(e.target.value)} placeholder="mis. PERPANJANGAN JADWAL PENDAFTARAN" className="w-full border border-gray-200 rounded-md px-2.5 py-1.5 text-sm" />
+                </div>
+              </>
+            )}
+            <div>
+              <label className="block text-xs font-semibold mb-1">Bentuk Tanda Tangan</label>
+              <select name="custom_signature" value={customSignature} onChange={(e) => setCustomSignature(e.target.value as SignatureSpec["kind"])} className="w-full border border-gray-200 rounded-md px-2.5 py-1.5 text-sm">
+                {(Object.keys(SIGNATURE_LABEL) as SignatureSpec["kind"][]).map((k) => (
+                  <option key={k} value={k}>{SIGNATURE_LABEL[k]}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+        )}
+
         <div>
           <label className="block text-xs font-semibold mb-1">Seleksi</label>
           <select name="selection_id" value={selectionId} onChange={(e) => setSelectionId(e.target.value)} className="w-full border border-gray-200 rounded-md px-2.5 py-1.5 text-sm">
@@ -116,6 +209,24 @@ export default function GeneratorForm({
           <label className="block text-xs font-semibold mb-1">Periode</label>
           <input name="periode" value={periode} onChange={(e) => setPeriode(e.target.value)} className="w-full border border-gray-200 rounded-md px-2.5 py-1.5 text-sm" />
         </div>
+
+        <div>
+          <div className="flex items-center justify-between mb-1">
+            <label className="block text-xs font-semibold">Isi Naskah (redaksi — bisa diedit bebas)</label>
+            {!isCustom && (
+              <button type="button" onClick={resetFromTemplate} className="text-[11px] text-navy-700 underline hover:text-navy-900">
+                ↻ Isi ulang dari template
+              </button>
+            )}
+          </div>
+          <textarea
+            name="isi" value={isi} onChange={(e) => setIsi(e.target.value)} rows={14} required
+            placeholder={isCustom ? "Tulis redaksi naskah di sini. Gunakan baris kosong ganda untuk memisahkan paragraf." : undefined}
+            className="w-full border border-gray-200 rounded-md px-2.5 py-1.5 text-xs font-mono leading-relaxed"
+          />
+          <p className="text-[11px] text-ink-500 mt-1">Baris kosong ganda memisahkan paragraf. Bagian berkurung seperti [tempat]/[jam] silakan diganti langsung sebelum surat difinalisasi.</p>
+        </div>
+
         <button type="submit" disabled={saving || !selectionId} className="w-full bg-navy-900 text-white text-sm font-semibold rounded-md px-4 py-2 disabled:opacity-50">
           {saving ? "Menyimpan..." : "Simpan sebagai Draf"}
         </button>
@@ -130,7 +241,7 @@ export default function GeneratorForm({
         <div className="bg-amber-50 border border-amber-200 text-amber-800 text-xs rounded-md p-3 mb-3">
           <b>Bahan Bantu, Bukan Dokumen Resmi.</b> Draf yang dihasilkan wajib diverifikasi oleh pejabat/pihak berwenang sebelum digunakan sebagai dokumen resmi. Simpan draf untuk mengunduh versi Word/PDF dan mencetaknya sesuai format tata naskah dinas.
         </div>
-        {preview && sel ? (
+        {computedData && sel ? (
           <div
             className="bg-white border border-gray-200 rounded-md p-8"
             style={{ fontFamily: "Arial, Helvetica, sans-serif", fontSize: "11pt", lineHeight: 1.5, textAlign: "justify" }}
@@ -139,39 +250,39 @@ export default function GeneratorForm({
               {sel.kop_url && <img src={sel.kop_url} alt={`Kop Surat ${sel.bumd_nama}`} className="w-full h-auto" />}
             </div>
             <div className="mb-4" />{/* jarak kop ke isi surat: 1.5 spasi */}
-            {preview.header ? (
+            {header ? (
               <div className="text-center mb-6">
-                <div className="font-bold underline uppercase">{preview.header.judul}</div>
-                <div>NOMOR: {preview.data.NOMOR}</div>
-                {preview.header.tentang && (
+                <div className="font-bold underline uppercase">{header.judul}</div>
+                <div>NOMOR: {computedData.NOMOR}</div>
+                {header.tentang && (
                   <>
                     <div className="mt-1">TENTANG</div>
-                    <div className="font-bold uppercase">{preview.header.tentang}</div>
+                    <div className="font-bold uppercase">{header.tentang}</div>
                   </>
                 )}
               </div>
             ) : (
               <>
-                <p className="text-right mb-4">Kota Batu, {preview.data.TANGGAL}</p>
-                <p className="mb-1">Nomor  : {preview.data.NOMOR}</p>
+                <p className="text-right mb-4">Kota Batu, {computedData.TANGGAL}</p>
+                <p className="mb-1">Nomor  : {computedData.NOMOR}</p>
                 <p className="mb-4">Perihal : {tpl.nama}</p>
               </>
             )}
-            {splitParagraphs(preview.body).map((para, i) => (
+            {splitParagraphs(isi).map((para, i) => (
               <p key={i} className="mb-4" style={{ whiteSpace: "pre-line" }}>{para}</p>
             ))}
-            {preview.header && (
-              <p className="mb-4" style={{ whiteSpace: "pre-line" }}>{`Ditetapkan di Kota Batu\npada tanggal ${preview.data.TANGGAL}`}</p>
+            {header && (
+              <p className="mb-4" style={{ whiteSpace: "pre-line" }}>{`Ditetapkan di Kota Batu\npada tanggal ${computedData.TANGGAL}`}</p>
             )}
             {tpl.signature.kind === "peserta" && (
               <div className="mt-8" style={{ marginLeft: "55%", width: "45%", textAlign: "left" }}>
                 <p>Yang membuat pernyataan,</p>
-                <p className="mt-14 font-bold underline">( {preview.data.NAMA_PESERTA} )</p>
+                <p className="mt-14 font-bold underline">( {computedData.NAMA_PESERTA} )</p>
               </div>
             )}
             {tpl.signature.kind === "single" && (
               <div className="mt-8" style={{ marginLeft: "55%", width: "45%", textAlign: "left" }}>
-                <p>{preview.panitia},</p>
+                <p>{computedData.PANITIA},</p>
                 <p className="mt-14 font-bold underline">( {signerNameOr(sig.ketua)} )</p>
                 <p>Ketua Panitia Seleksi</p>
                 <p>{signerNipLine(sig.ketua)}</p>

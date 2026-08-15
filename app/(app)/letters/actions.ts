@@ -2,7 +2,7 @@
 
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
-import { findTemplate, fillTemplate, fmtTanggalPanjang } from "@/lib/letter-templates";
+import { findTemplate, fillTemplate, fmtTanggalPanjang, CUSTOM_TEMPLATE_ID } from "@/lib/letter-templates";
 
 async function currentProfile() {
   const supabase = await createClient();
@@ -12,9 +12,30 @@ async function currentProfile() {
   return { supabase, role: profile?.role as string | undefined };
 }
 
-// Panitia: susun & simpan draf surat. Isi surat dihitung ulang di server dari
-// data seleksi/BUMD terkini (bukan dari input client) supaya draf yang
-// tersimpan selalu konsisten dengan sumber data resmi.
+function readCustomFields(formData: FormData) {
+  const namaSurat = String(formData.get("nama_surat") || "").trim();
+  const customJudul = String(formData.get("custom_judul") || "").trim();
+  const customTentang = String(formData.get("custom_tentang") || "").trim();
+  const customLayout = String(formData.get("custom_layout") || "korespondensi").trim();
+  const customSignature = String(formData.get("custom_signature") || "single").trim();
+  if (!namaSurat) throw new Error("Judul/nama naskah wajib diisi untuk Naskah Dinas Kustom.");
+  if (!["korespondensi", "judul"].includes(customLayout)) throw new Error("Bentuk naskah tidak dikenali.");
+  if (!["single", "table5", "block3", "peserta"].includes(customSignature)) throw new Error("Bentuk tanda tangan tidak dikenali.");
+  return {
+    nama_surat: namaSurat,
+    custom_judul: customJudul || namaSurat.toUpperCase(),
+    custom_tentang: customTentang || null,
+    custom_layout: customLayout,
+    custom_signature: customSignature,
+  };
+}
+
+// Panitia: susun & simpan draf surat. Untuk template baku, isi dihitung dari
+// data seleksi/BUMD terkini kecuali Panitia sudah menuliskan redaksinya
+// sendiri di kolom "Isi Naskah" (isi bebas diedit — lihat
+// migration_0010_daftar_hadir_dan_naskah_kustom.sql). Untuk Naskah Dinas
+// Kustom ("custom"), judul/tentang/bentuk naskah/bentuk tanda tangan juga
+// ditentukan Panitia sendiri, bukan dari katalog template.
 export async function createLetterAction(formData: FormData) {
   const { supabase, role } = await currentProfile();
   if (role !== "PANITIA_SELEKSI") throw new Error("Hanya Panitia Seleksi yang dapat membuat draf surat.");
@@ -25,10 +46,13 @@ export async function createLetterAction(formData: FormData) {
   const tanggal = String(formData.get("tanggal") || "");
   const nama_peserta = String(formData.get("nama_peserta") || "").trim();
   const periode = String(formData.get("periode") || "").trim();
+  const isiOverride = String(formData.get("isi") || "").trim();
 
-  const tpl = findTemplate(jenis_surat);
-  if (!tpl) throw new Error("Jenis surat tidak dikenali.");
+  const isCustom = jenis_surat === CUSTOM_TEMPLATE_ID;
+  const tpl = isCustom ? null : findTemplate(jenis_surat);
+  if (!isCustom && !tpl) throw new Error("Jenis surat tidak dikenali.");
   if (!selection_id || !nomor || !tanggal) throw new Error("Seleksi, nomor, dan tanggal wajib diisi.");
+  if (isCustom && !isiOverride) throw new Error("Isi naskah wajib diisi untuk Naskah Dinas Kustom.");
 
   const { data: sel } = await supabase
     .from("selections")
@@ -55,29 +79,40 @@ export async function createLetterAction(formData: FormData) {
     PANITIA: panitia,
     TIM_UKK: "Tim Uji Kompetensi dan Kelayakan",
   };
-  const isi = fillTemplate(tpl.template, data);
+  const isi = isiOverride || (tpl ? fillTemplate(tpl.template, data) : "");
+
+  const custom = isCustom ? readCustomFields(formData) : null;
 
   const { data: inserted, error } = await supabase
     .from("letters")
     .insert({
-      selection_id, jenis_surat, nama_surat: tpl.nama, nomor, tanggal,
+      selection_id, jenis_surat,
+      nama_surat: custom ? custom.nama_surat : (tpl?.nama ?? "Naskah"),
+      nomor, tanggal,
       nama_peserta: nama_peserta || null, jabatan: sel.jabatan, periode: periode || null,
       dasar_hukum: sel.dasar_hukum || null, isi, status: "DRAFT",
+      custom_judul: custom?.custom_judul ?? null,
+      custom_tentang: custom?.custom_tentang ?? null,
+      custom_layout: custom?.custom_layout ?? null,
+      custom_signature: custom?.custom_signature ?? null,
     })
     .select("id")
     .single();
   if (error) throw error;
 
   await supabase.rpc("write_audit_log", {
-    p_module: "Letter", p_action: "CREATE_LETTER", p_old_value: "-", p_new_value: tpl.nama, p_selection: selection_id,
+    p_module: "Letter", p_action: "CREATE_LETTER", p_old_value: "-", p_new_value: custom?.nama_surat ?? tpl?.nama ?? "Naskah", p_selection: selection_id,
   });
   revalidatePath("/letters");
   return inserted?.id as string;
 }
 
-// Panitia: ubah draf yang sudah tersimpan (nomor/tanggal/peserta/periode/
-// jenis surat) — isi dihitung ulang persis seperti saat pembuatan. Hanya
-// berlaku selama draf masih berstatus DRAFT.
+// Panitia: ubah draf yang sudah tersimpan. Nomor/tanggal/peserta/periode dan
+// (untuk Naskah Kustom) judul/tentang/bentuk naskah/tanda tangan bisa
+// diubah; redaksi ("Isi Naskah") sekarang SELALU dipakai persis seperti yang
+// dituliskan di form — tidak lagi dihitung ulang otomatis dari template
+// setiap disimpan, supaya suntingan Panitia atas redaksi tidak pernah
+// tertimpa. Hanya berlaku selama draf masih berstatus DRAFT.
 export async function updateLetterAction(id: string, formData: FormData) {
   const { supabase, role } = await currentProfile();
   if (role !== "PANITIA_SELEKSI") throw new Error("Hanya Panitia Seleksi yang dapat mengubah draf surat.");
@@ -87,48 +122,42 @@ export async function updateLetterAction(id: string, formData: FormData) {
   const tanggal = String(formData.get("tanggal") || "");
   const nama_peserta = String(formData.get("nama_peserta") || "").trim();
   const periode = String(formData.get("periode") || "").trim();
+  const isi = String(formData.get("isi") || "").trim();
 
-  const tpl = findTemplate(jenis_surat);
-  if (!tpl) throw new Error("Jenis surat tidak dikenali.");
+  const isCustom = jenis_surat === CUSTOM_TEMPLATE_ID;
+  const tpl = isCustom ? null : findTemplate(jenis_surat);
+  if (!isCustom && !tpl) throw new Error("Jenis surat tidak dikenali.");
   if (!nomor || !tanggal) throw new Error("Nomor dan tanggal wajib diisi.");
+  if (!isi) throw new Error("Isi naskah tidak boleh kosong.");
 
   const { data: existing, error: findErr } = await supabase
     .from("letters")
-    .select("id, status, selection_id, selections(jabatan, dasar_hukum, bumds(nama))")
+    .select("id, status, selection_id")
     .eq("id", id)
     .single();
   if (findErr || !existing) throw new Error("Draf surat tidak ditemukan.");
   if (existing.status !== "DRAFT") throw new Error("Surat yang sudah Final tidak dapat diubah.");
 
-  const sel = (existing as any).selections;
-  const bumdNama = sel?.bumds?.nama || "-";
-  const jabatan = sel?.jabatan || "-";
-  const panitia = `Panitia Seleksi ${jabatan} ${bumdNama}`;
-  const data: Record<string, string> = {
-    NOMOR: nomor,
-    TANGGAL: fmtTanggalPanjang(tanggal),
-    BUMD: bumdNama,
-    NAMA_PESERTA: nama_peserta || "[Nama Peserta]",
-    JABATAN: jabatan,
-    PERIODE: periode || "-",
-    DASAR_HUKUM: sel?.dasar_hukum || "—",
-    PANITIA: panitia,
-    TIM_UKK: "Tim Uji Kompetensi dan Kelayakan",
-  };
-  const isi = fillTemplate(tpl.template, data);
+  const custom = isCustom ? readCustomFields(formData) : null;
 
   const { error } = await supabase
     .from("letters")
     .update({
-      jenis_surat, nama_surat: tpl.nama, nomor, tanggal,
+      jenis_surat,
+      nama_surat: custom ? custom.nama_surat : (tpl?.nama ?? "Naskah"),
+      nomor, tanggal,
       nama_peserta: nama_peserta || null, periode: periode || null, isi,
+      custom_judul: custom?.custom_judul ?? null,
+      custom_tentang: custom?.custom_tentang ?? null,
+      custom_layout: custom?.custom_layout ?? null,
+      custom_signature: custom?.custom_signature ?? null,
     })
     .eq("id", id)
     .eq("status", "DRAFT");
   if (error) throw error;
 
   await supabase.rpc("write_audit_log", {
-    p_module: "Letter", p_action: "UPDATE_LETTER", p_old_value: "-", p_new_value: tpl.nama, p_selection: existing.selection_id,
+    p_module: "Letter", p_action: "UPDATE_LETTER", p_old_value: "-", p_new_value: custom?.nama_surat ?? tpl?.nama ?? "Naskah", p_selection: existing.selection_id,
   });
   revalidatePath("/letters");
   revalidatePath(`/letters/${id}/edit`);

@@ -1,5 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
-import { findTemplate, letterDataFrom, letterHeaderFor, splitParagraphs } from "@/lib/letter-templates";
+import { resolveTemplate, letterDataFrom, letterHeaderFor, splitParagraphs } from "@/lib/letter-templates";
 import { kopBannerAssetFor } from "@/lib/letter-format";
 import { fetchSignatureData, signerNameOr, signerNipLine, type Signer } from "@/lib/letter-signature";
 import PrintButton from "@/components/PrintButton";
@@ -18,7 +18,7 @@ export default async function LetterPrintPage({ params }: { params: Promise<{ id
   const bumdNama: string = bumd?.nama || "-";
   const kopUrl = kopBannerAssetFor(bumdNama);
 
-  const tpl = findTemplate(letter.jenis_surat);
+  const tpl = resolveTemplate(letter as any);
   const data = letterDataFrom(letter, bumdNama);
   const header = tpl ? letterHeaderFor(tpl, data) : null;
   const paragraphs = splitParagraphs(letter.isi || "");

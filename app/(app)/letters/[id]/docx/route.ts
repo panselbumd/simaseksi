@@ -9,7 +9,7 @@ import {
   PAGE_MARGIN_TWIP, FONT_FAMILY, FONT_SIZE_HALF_PT, LINE_SPACING_DOCX,
   kopBannerAssetFor, kopBannerAspectRatioFor,
 } from "@/lib/letter-format";
-import { findTemplate, letterDataFrom, letterHeaderFor, splitParagraphs } from "@/lib/letter-templates";
+import { resolveTemplate, letterDataFrom, letterHeaderFor, splitParagraphs } from "@/lib/letter-templates";
 import { fetchSignatureData, signerNameOr, signerNipLine, type Signer } from "@/lib/letter-signature";
 
 const NO_BORDER = { style: BorderStyle.NONE, size: 0, color: "FFFFFF" } as const;
@@ -30,7 +30,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
   const bumd = (letter as any).selections?.bumds;
   const bumdNama: string = bumd?.nama || "-";
 
-  const tpl = findTemplate(letter.jenis_surat);
+  const tpl = resolveTemplate(letter as any);
   const data = letterDataFrom(letter, bumdNama);
   const header = tpl ? letterHeaderFor(tpl, data) : null;
   const paragraphs = splitParagraphs(letter.isi || "");

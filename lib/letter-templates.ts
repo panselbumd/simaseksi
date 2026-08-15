@@ -498,6 +498,42 @@ export function findTemplate(id: string): LetterTemplate | undefined {
   return LETTER_TEMPLATES.find((t) => t.id === id);
 }
 
+/** Naskah dinas kustom yang dibuat Panitia dari kosong (lihat migration
+ * 0010: letters.custom_judul/custom_tentang/custom_layout/custom_signature).
+ * jenis_surat pada baris letters yang bersangkutan bernilai literal
+ * "custom" untuk menandai ini. */
+export type CustomLetterFields = {
+  nama_surat: string;
+  custom_judul: string | null;
+  custom_tentang: string | null;
+  custom_layout: string | null;
+  custom_signature: string | null;
+};
+
+export const CUSTOM_TEMPLATE_ID = "custom";
+
+/** Resolves the LetterTemplate to render for a saved letter row — either a
+ * fixed catalog entry (findTemplate), or a synthetic one built from the
+ * letter's own custom_* columns when jenis_surat === "custom". Every
+ * renderer (cetak/pdf/docx/preview) should go through this instead of
+ * calling findTemplate() directly, so naskah kustom render identically
+ * everywhere. */
+export function resolveTemplate(letter: { jenis_surat: string } & Partial<CustomLetterFields>): LetterTemplate | undefined {
+  if (letter.jenis_surat !== CUSTOM_TEMPLATE_ID) return findTemplate(letter.jenis_surat);
+  const layout = (letter.custom_layout as LetterLayout) || "korespondensi";
+  const sigKind = (letter.custom_signature as SignatureSpec["kind"]) || "single";
+  return {
+    id: CUSTOM_TEMPLATE_ID,
+    nama: letter.nama_surat || "Naskah Kustom",
+    kategori: "Kustom",
+    layout,
+    judulDinas: letter.custom_judul || letter.nama_surat || "NASKAH DINAS",
+    tentang: letter.custom_tentang || undefined,
+    signature: { kind: sigKind },
+    template: "",
+  };
+}
+
 /** Kategori dalam urutan tampil pada Generator Surat, mengikuti struktur paket naskah_surat. */
 export const LETTER_CATEGORIES = [
   "Berita Acara", "Pengumuman", "Surat Internal Panitia", "Surat Kepada Peserta", "Lainnya",

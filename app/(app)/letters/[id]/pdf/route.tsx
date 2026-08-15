@@ -4,7 +4,7 @@ import path from "node:path";
 import { Document, Page, Text, View, Image, StyleSheet, Font, renderToBuffer } from "@react-pdf/renderer";
 import { createClient } from "@/lib/supabase/server";
 import { PAGE_MARGIN_CM, kopBannerAssetFor } from "@/lib/letter-format";
-import { findTemplate, letterDataFrom, letterHeaderFor, splitParagraphs } from "@/lib/letter-templates";
+import { resolveTemplate, letterDataFrom, letterHeaderFor, splitParagraphs } from "@/lib/letter-templates";
 import { fetchSignatureData, signerNameOr, signerNipLine, type Signer } from "@/lib/letter-signature";
 
 // Arial itself can't be bundled (proprietary), so we register Arimo — a
@@ -82,7 +82,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
   const bumd = (letter as any).selections?.bumds;
   const bumdNama: string = bumd?.nama || "-";
 
-  const tpl = findTemplate(letter.jenis_surat);
+  const tpl = resolveTemplate(letter as any);
   const data = letterDataFrom(letter, bumdNama);
   const header = tpl ? letterHeaderFor(tpl, data) : null;
   const paragraphs = splitParagraphs(letter.isi || "");

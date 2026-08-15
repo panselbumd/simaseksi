@@ -48,6 +48,12 @@ export default async function EditLetterPage({ params }: { params: Promise<{ id:
             tanggal: letter.tanggal,
             nama_peserta: letter.nama_peserta || "",
             periode: letter.periode || "",
+            isi: letter.isi || "",
+            nama_surat: letter.nama_surat || "",
+            custom_judul: letter.custom_judul || "",
+            custom_tentang: letter.custom_tentang || "",
+            custom_layout: (letter.custom_layout as any) || "korespondensi",
+            custom_signature: (letter.custom_signature as any) || "single",
           }}
           bumdNama={bumdNama}
           jabatan={sel?.jabatan || "-"}
