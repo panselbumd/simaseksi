@@ -2,7 +2,8 @@
 
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { LETTER_TEMPLATES, fillTemplate, fmtTanggalPanjang, letterHeaderFor, splitParagraphs } from "@/lib/letter-templates";
+import { LETTER_TEMPLATES, LETTER_CATEGORIES, fillTemplate, fmtTanggalPanjang, letterHeaderFor, splitParagraphs } from "@/lib/letter-templates";
+import { signerNameOr, signerNipLine, type SignatureData } from "@/lib/letter-signature";
 import { createLetterAction } from "./actions";
 
 type SelectionOption = {
@@ -15,7 +16,15 @@ type SelectionOption = {
   alamat: string | null;
 };
 
-export default function GeneratorForm({ selections, initialSelectionId }: { selections: SelectionOption[]; initialSelectionId?: string }) {
+const EMPTY_SIGNATURE: SignatureData = { ketua: null, sekretaris: null, anggota: [], timUkk: [] };
+
+export default function GeneratorForm({
+  selections, initialSelectionId, signatureBySelection = {},
+}: {
+  selections: SelectionOption[];
+  initialSelectionId?: string;
+  signatureBySelection?: Record<string, SignatureData>;
+}) {
   const router = useRouter();
   const [jenisId, setJenisId] = useState(LETTER_TEMPLATES[0].id);
   const [selectionId, setSelectionId] = useState(
@@ -30,6 +39,7 @@ export default function GeneratorForm({ selections, initialSelectionId }: { sele
 
   const tpl = LETTER_TEMPLATES.find((t) => t.id === jenisId)!;
   const sel = selections.find((s) => s.id === selectionId);
+  const sig = signatureBySelection[selectionId] ?? EMPTY_SIGNATURE;
 
   const preview = useMemo(() => {
     if (!sel) return null;
@@ -75,7 +85,13 @@ export default function GeneratorForm({ selections, initialSelectionId }: { sele
         <div>
           <label className="block text-xs font-semibold mb-1">Jenis Surat</label>
           <select name="jenis_surat" value={jenisId} onChange={(e) => setJenisId(e.target.value)} className="w-full border border-gray-200 rounded-md px-2.5 py-1.5 text-sm">
-            {LETTER_TEMPLATES.map((t) => <option key={t.id} value={t.id}>{t.nama}</option>)}
+            {LETTER_CATEGORIES.map((kategori) => (
+              <optgroup key={kategori} label={kategori}>
+                {LETTER_TEMPLATES.filter((t) => t.kategori === kategori).map((t) => (
+                  <option key={t.id} value={t.id}>{t.nama}</option>
+                ))}
+              </optgroup>
+            ))}
           </select>
         </div>
         <div>
@@ -147,20 +163,67 @@ export default function GeneratorForm({ selections, initialSelectionId }: { sele
             {preview.header && (
               <p className="mb-4" style={{ whiteSpace: "pre-line" }}>{`Ditetapkan di Kota Batu\npada tanggal ${preview.data.TANGGAL}`}</p>
             )}
-            <div className="mt-8" style={{ marginLeft: "55%", width: "45%", textAlign: "left" }}>
-              {tpl.signatureRole === "peserta" ? (
-                <>
-                  <p>Yang membuat pernyataan,</p>
-                  <p className="mt-14 font-bold underline">( {preview.data.NAMA_PESERTA} )</p>
-                </>
-              ) : (
-                <>
-                  <p>{preview.panitia},</p>
-                  <p className="mt-14 font-bold underline">( ................................................ )</p>
-                  <p>Ketua Panitia Seleksi</p>
-                </>
-              )}
-            </div>
+            {tpl.signature.kind === "peserta" && (
+              <div className="mt-8" style={{ marginLeft: "55%", width: "45%", textAlign: "left" }}>
+                <p>Yang membuat pernyataan,</p>
+                <p className="mt-14 font-bold underline">( {preview.data.NAMA_PESERTA} )</p>
+              </div>
+            )}
+            {tpl.signature.kind === "single" && (
+              <div className="mt-8" style={{ marginLeft: "55%", width: "45%", textAlign: "left" }}>
+                <p>{preview.panitia},</p>
+                <p className="mt-14 font-bold underline">( {signerNameOr(sig.ketua)} )</p>
+                <p>Ketua Panitia Seleksi</p>
+                <p>{signerNipLine(sig.ketua)}</p>
+              </div>
+            )}
+            {tpl.signature.kind === "table5" && (
+              <table className="mt-8 w-full text-xs border-collapse" style={{ border: "1px solid #333" }}>
+                <thead>
+                  <tr>
+                    <th className="border border-gray-800 px-2 py-1 w-8">No</th>
+                    <th className="border border-gray-800 px-2 py-1">Nama</th>
+                    <th className="border border-gray-800 px-2 py-1">Jabatan</th>
+                    <th className="border border-gray-800 px-2 py-1">Tanda Tangan</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {[
+                    { jabatan: "Ketua Pansel", signer: sig.ketua },
+                    { jabatan: "Sekretariat Pansel", signer: sig.sekretaris },
+                    { jabatan: "Anggota", signer: sig.anggota[0] ?? null },
+                    { jabatan: "Anggota", signer: sig.anggota[1] ?? null },
+                    { jabatan: "Anggota", signer: sig.anggota[2] ?? null },
+                  ].map((row, i) => (
+                    <tr key={i}>
+                      <td className="border border-gray-800 px-2 py-1 text-center">{i + 1}</td>
+                      <td className="border border-gray-800 px-2 py-1">{signerNameOr(row.signer)}</td>
+                      <td className="border border-gray-800 px-2 py-1">{row.jabatan}</td>
+                      <td className="border border-gray-800 px-2 py-1">&nbsp;</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+            {tpl.signature.kind === "block3" && (
+              <table className="mt-8 w-full text-xs border-collapse" style={{ border: "1px solid #333" }}>
+                <tbody>
+                  <tr>
+                    {[
+                      { label: "KETUA PANITIA SELEKSI", signer: sig.ketua },
+                      { label: "SEKRETARIS PANITIA SELEKSI", signer: sig.sekretaris },
+                      { label: "ANGGOTA/PEJABAT TERKAIT", signer: sig.anggota[0] ?? null },
+                    ].map((col, i) => (
+                      <td key={i} className="border border-gray-800 px-2 py-2 text-center align-top w-1/3">
+                        <div className="font-bold mb-10">{col.label}</div>
+                        <div className="font-bold underline">{signerNameOr(col.signer)}</div>
+                        <div>{signerNipLine(col.signer)}</div>
+                      </td>
+                    ))}
+                  </tr>
+                </tbody>
+              </table>
+            )}
           </div>
         ) : (
           <div className="bg-white border border-dashed border-gray-300 rounded-md p-10 text-center text-sm text-ink-500">

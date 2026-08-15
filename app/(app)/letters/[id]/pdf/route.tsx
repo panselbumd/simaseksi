@@ -5,6 +5,7 @@ import { Document, Page, Text, View, Image, StyleSheet, Font, renderToBuffer } f
 import { createClient } from "@/lib/supabase/server";
 import { PAGE_MARGIN_CM, kopBannerAssetFor } from "@/lib/letter-format";
 import { findTemplate, letterDataFrom, letterHeaderFor, splitParagraphs } from "@/lib/letter-templates";
+import { fetchSignatureData, signerNameOr, signerNipLine, type Signer } from "@/lib/letter-signature";
 
 // Arial itself can't be bundled (proprietary), so we register Arimo — a
 // metrically-compatible, open-license substitute purpose-built to match
@@ -49,6 +50,19 @@ function makeStyles(fontFamily: string) {
     judul: { fontWeight: 700, textDecoration: "underline" },
     tentang: { fontWeight: 700 },
     signatureBlock: { marginTop: 30, marginLeft: "55%", width: "45%" },
+    table5: { marginTop: 20, borderWidth: 1, borderColor: "#333" },
+    table5Row: { flexDirection: "row" as const, borderBottomWidth: 1, borderColor: "#333" },
+    table5RowLast: { flexDirection: "row" as const },
+    table5CellNo: { width: "8%", padding: 5, borderRightWidth: 1, borderColor: "#333", textAlign: "center" as const },
+    table5CellNama: { width: "37%", padding: 5, borderRightWidth: 1, borderColor: "#333" },
+    table5CellJabatan: { width: "30%", padding: 5, borderRightWidth: 1, borderColor: "#333" },
+    table5CellTtd: { width: "25%", padding: 5 },
+    table5Header: { flexDirection: "row" as const, borderBottomWidth: 1, borderColor: "#333", fontWeight: 700 },
+    table3: { marginTop: 20, flexDirection: "row" as const, borderWidth: 1, borderColor: "#333" },
+    table3Cell: { width: "33.33%", padding: 8, borderRightWidth: 1, borderColor: "#333", textAlign: "center" as const },
+    table3CellLast: { width: "33.33%", padding: 8, textAlign: "center" as const },
+    table3Label: { fontWeight: 700, marginBottom: 44 },
+    table3Nama: { fontWeight: 700, textDecoration: "underline" },
   });
 }
 
@@ -72,7 +86,16 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
   const data = letterDataFrom(letter, bumdNama);
   const header = tpl ? letterHeaderFor(tpl, data) : null;
   const paragraphs = splitParagraphs(letter.isi || "");
-  const signatureRole = tpl?.signatureRole ?? "panitia";
+  const sigKind = tpl?.signature.kind ?? "single";
+  const sig = await fetchSignatureData(supabase, (letter as any).selection_id);
+  const anggotaRows: (Signer | null)[] = [sig.anggota[0] ?? null, sig.anggota[1] ?? null, sig.anggota[2] ?? null];
+  const table5Rows = [
+    { jabatan: "Ketua Pansel", signer: sig.ketua },
+    { jabatan: "Sekretariat Pansel", signer: sig.sekretaris },
+    { jabatan: "Anggota", signer: anggotaRows[0] },
+    { jabatan: "Anggota", signer: anggotaRows[1] },
+    { jabatan: "Anggota", signer: anggotaRows[2] },
+  ];
 
   // Always the bundled official letterhead banner, read straight off disk
   // (no network round-trip; see lib/letter-format.ts for why we don't read
@@ -120,20 +143,60 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
 
         {header && <Text style={{ marginBottom: 10 }}>{`Ditetapkan di Kota Batu\npada tanggal ${data.TANGGAL}`}</Text>}
 
-        <View style={styles.signatureBlock}>
-          {signatureRole === "peserta" ? (
-            <>
-              <Text>Yang membuat pernyataan,</Text>
-              <Text style={{ marginTop: 55, fontWeight: 700, textDecoration: "underline" }}>( {data.NAMA_PESERTA} )</Text>
-            </>
-          ) : (
-            <>
-              <Text>{data.PANITIA},</Text>
-              <Text style={{ marginTop: 55, fontWeight: 700, textDecoration: "underline" }}>( ................................................ )</Text>
-              <Text>Ketua Panitia Seleksi</Text>
-            </>
-          )}
-        </View>
+        {sigKind === "peserta" && (
+          <View style={styles.signatureBlock}>
+            <Text>Yang membuat pernyataan,</Text>
+            <Text style={{ marginTop: 55, fontWeight: 700, textDecoration: "underline" }}>( {data.NAMA_PESERTA} )</Text>
+          </View>
+        )}
+
+        {sigKind === "single" && (
+          <View style={styles.signatureBlock}>
+            <Text>{data.PANITIA},</Text>
+            <Text style={{ marginTop: 55, fontWeight: 700, textDecoration: "underline" }}>( {signerNameOr(sig.ketua)} )</Text>
+            <Text>Ketua Panitia Seleksi</Text>
+            <Text>{signerNipLine(sig.ketua)}</Text>
+          </View>
+        )}
+
+        {sigKind === "table5" && (
+          <View style={styles.table5}>
+            <View style={styles.table5Header}>
+              <Text style={styles.table5CellNo}>No</Text>
+              <Text style={styles.table5CellNama}>Nama</Text>
+              <Text style={styles.table5CellJabatan}>Jabatan</Text>
+              <Text style={styles.table5CellTtd}>Tanda Tangan</Text>
+            </View>
+            {table5Rows.map((row, i) => (
+              <View key={i} style={i === table5Rows.length - 1 ? styles.table5RowLast : styles.table5Row}>
+                <Text style={styles.table5CellNo}>{i + 1}</Text>
+                <Text style={styles.table5CellNama}>{signerNameOr(row.signer)}</Text>
+                <Text style={styles.table5CellJabatan}>{row.jabatan}</Text>
+                <Text style={styles.table5CellTtd}> </Text>
+              </View>
+            ))}
+          </View>
+        )}
+
+        {sigKind === "block3" && (
+          <View style={styles.table3}>
+            <View style={styles.table3Cell}>
+              <Text style={styles.table3Label}>KETUA PANITIA SELEKSI</Text>
+              <Text style={styles.table3Nama}>{signerNameOr(sig.ketua)}</Text>
+              <Text>{signerNipLine(sig.ketua)}</Text>
+            </View>
+            <View style={styles.table3Cell}>
+              <Text style={styles.table3Label}>SEKRETARIS PANITIA SELEKSI</Text>
+              <Text style={styles.table3Nama}>{signerNameOr(sig.sekretaris)}</Text>
+              <Text>{signerNipLine(sig.sekretaris)}</Text>
+            </View>
+            <View style={styles.table3CellLast}>
+              <Text style={styles.table3Label}>ANGGOTA/PEJABAT TERKAIT</Text>
+              <Text style={styles.table3Nama}>{signerNameOr(sig.anggota[0] ?? null)}</Text>
+              <Text>{signerNipLine(sig.anggota[0] ?? null)}</Text>
+            </View>
+          </View>
+        )}
       </Page>
     </Document>
   );

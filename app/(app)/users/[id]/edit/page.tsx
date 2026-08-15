@@ -34,6 +34,20 @@ export default async function EditUserPage({ params }: { params: Promise<{ id: s
           <input name="unit" defaultValue={user.unit ?? ""} className="w-full border border-gray-200 rounded-md px-2.5 py-1.5 text-sm" />
         </div>
         <div>
+          <label className="block text-xs font-semibold mb-1">NIP (untuk PNS)</label>
+          <input name="nip" defaultValue={user.nip ?? ""} placeholder="Kosongkan jika non-PNS" className="w-full border border-gray-200 rounded-md px-2.5 py-1.5 text-sm" />
+        </div>
+        <div>
+          <label className="block text-xs font-semibold mb-1">Jabatan dalam Tim</label>
+          <select name="jabatan_tim" defaultValue={user.jabatan_tim ?? ""} className="w-full border border-gray-200 rounded-md px-2.5 py-1.5 text-sm">
+            <option value="">— (khusus Panitia Seleksi) —</option>
+            <option value="KETUA">Ketua</option>
+            <option value="SEKRETARIS">Sekretaris</option>
+            <option value="ANGGOTA">Anggota</option>
+          </select>
+          <p className="text-xs text-ink-500 mt-1">Wajib dipilih untuk akun Panitia Seleksi — dipakai menarik Nama &amp; NIP otomatis ke tanda tangan naskah dinas. Mengubah ini juga memperbarui posisi orang tsb pada seluruh seleksi yang sedang ia ikuti.</p>
+        </div>
+        <div>
           <label className="block text-xs font-semibold mb-1">Password Baru (opsional)</label>
           <input name="password" type="password" placeholder="Kosongkan bila tidak diubah" className="w-full border border-gray-200 rounded-md px-2.5 py-1.5 text-sm" />
         </div>

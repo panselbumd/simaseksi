@@ -10,6 +10,7 @@ import {
   kopBannerAssetFor, kopBannerAspectRatioFor,
 } from "@/lib/letter-format";
 import { findTemplate, letterDataFrom, letterHeaderFor, splitParagraphs } from "@/lib/letter-templates";
+import { fetchSignatureData, signerNameOr, signerNipLine, type Signer } from "@/lib/letter-signature";
 
 const NO_BORDER = { style: BorderStyle.NONE, size: 0, color: "FFFFFF" } as const;
 
@@ -33,7 +34,16 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
   const data = letterDataFrom(letter, bumdNama);
   const header = tpl ? letterHeaderFor(tpl, data) : null;
   const paragraphs = splitParagraphs(letter.isi || "");
-  const signatureRole = tpl?.signatureRole ?? "panitia";
+  const sigKind = tpl?.signature.kind ?? "single";
+  const sig = await fetchSignatureData(supabase, (letter as any).selection_id);
+  const anggotaRows: (Signer | null)[] = [sig.anggota[0] ?? null, sig.anggota[1] ?? null, sig.anggota[2] ?? null];
+  const table5Rows = [
+    { jabatan: "Ketua Pansel", signer: sig.ketua },
+    { jabatan: "Sekretariat Pansel", signer: sig.sekretaris },
+    { jabatan: "Anggota", signer: anggotaRows[0] },
+    { jabatan: "Anggota", signer: anggotaRows[1] },
+    { jabatan: "Anggota", signer: anggotaRows[2] },
+  ];
 
   // Always the bundled official letterhead banner, read straight off disk
   // (see lib/letter-format.ts for why we don't read bumds.kop_image_path /
@@ -115,7 +125,10 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
       ]
     : [];
 
-  const signatureCellChildren = signatureRole === "peserta"
+  // "single"/"peserta": satu blok, sisi kanan halaman, teks rata kiri di
+  // dalam blok — dibungkus tabel 2 kolom tanpa border agar posisinya tetap
+  // di kanan tanpa memengaruhi perataan teks di dalamnya.
+  const signatureCellChildren = sigKind === "peserta"
     ? [
         new Paragraph({ alignment: AlignmentType.LEFT, spacing, children: [run("Yang membuat pernyataan,")] }),
         new Paragraph({ children: [run("")] }),
@@ -128,9 +141,92 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
         new Paragraph({ children: [run("")] }),
         new Paragraph({ children: [run("")] }),
         new Paragraph({ children: [run("")] }),
-        new Paragraph({ alignment: AlignmentType.LEFT, children: [run("( ................................................ )", { bold: true, underline: {} })] }),
+        new Paragraph({ alignment: AlignmentType.LEFT, children: [run(`( ${signerNameOr(sig.ketua)} )`, { bold: true, underline: {} })] }),
         new Paragraph({ alignment: AlignmentType.LEFT, children: [run("Ketua Panitia Seleksi")] }),
+        new Paragraph({ alignment: AlignmentType.LEFT, children: [run(signerNipLine(sig.ketua))] }),
       ];
+
+  const THIN_BORDER = { style: BorderStyle.SINGLE, size: 4, color: "333333" } as const;
+  const cell = (children: Paragraph[], opts: { width?: number; center?: boolean } = {}) =>
+    new TableCell({
+      width: { size: opts.width ?? 100, type: WidthType.PERCENTAGE },
+      borders: { top: THIN_BORDER, bottom: THIN_BORDER, left: THIN_BORDER, right: THIN_BORDER },
+      children,
+    });
+  const p = (text: string, opts: { bold?: boolean; underline?: boolean; center?: boolean } = {}) =>
+    new Paragraph({
+      alignment: opts.center ? AlignmentType.CENTER : undefined,
+      spacing,
+      children: [run(text, { bold: opts.bold, underline: opts.underline ? {} : undefined })],
+    });
+
+  // table5: Ketua/Sekretaris/Anggota1-3 menandatangani individual, satu
+  // baris per orang, dalam tabel penuh lebar halaman.
+  const table5 = sigKind === "table5"
+    ? new Table({
+        width: { size: 100, type: WidthType.PERCENTAGE },
+        rows: [
+          new TableRow({ children: [
+            cell([p("No", { bold: true, center: true })], { width: 8 }),
+            cell([p("Nama", { bold: true, center: true })], { width: 37 }),
+            cell([p("Jabatan", { bold: true, center: true })], { width: 30 }),
+            cell([p("Tanda Tangan", { bold: true, center: true })], { width: 25 }),
+          ]}),
+          ...table5Rows.map((row, i) => new TableRow({ children: [
+            cell([p(String(i + 1), { center: true })], { width: 8 }),
+            cell([p(signerNameOr(row.signer))], { width: 37 }),
+            cell([p(row.jabatan)], { width: 30 }),
+            cell([p(" ")], { width: 25 }),
+          ]})),
+        ],
+      })
+    : null;
+
+  // block3: Ketua / Sekretaris / Anggota, masing-masing Nama+NIP, dalam
+  // satu baris 3 kolom.
+  const block3 = sigKind === "block3"
+    ? new Table({
+        width: { size: 100, type: WidthType.PERCENTAGE },
+        rows: [new TableRow({ children: [
+          cell([
+            p("KETUA PANITIA SELEKSI", { bold: true, center: true }),
+            p(""), p(""), p(""),
+            p(signerNameOr(sig.ketua), { bold: true, underline: true, center: true }),
+            p(signerNipLine(sig.ketua), { center: true }),
+          ], { width: 33 }),
+          cell([
+            p("SEKRETARIS PANITIA SELEKSI", { bold: true, center: true }),
+            p(""), p(""), p(""),
+            p(signerNameOr(sig.sekretaris), { bold: true, underline: true, center: true }),
+            p(signerNipLine(sig.sekretaris), { center: true }),
+          ], { width: 33 }),
+          cell([
+            p("ANGGOTA/PEJABAT TERKAIT", { bold: true, center: true }),
+            p(""), p(""), p(""),
+            p(signerNameOr(sig.anggota[0] ?? null), { bold: true, underline: true, center: true }),
+            p(signerNipLine(sig.anggota[0] ?? null), { center: true }),
+          ], { width: 34 }),
+        ]})],
+      })
+    : null;
+
+  // "single"/"peserta": blok kanan halaman dibungkus tabel 2 kolom tanpa
+  // border agar posisinya tetap di kanan tanpa memengaruhi perataan teks
+  // di dalamnya.
+  const singleOrPesertaTable = (sigKind === "single" || sigKind === "peserta")
+    ? new Table({
+        width: { size: 100, type: WidthType.PERCENTAGE },
+        borders: { top: NO_BORDER, bottom: NO_BORDER, left: NO_BORDER, right: NO_BORDER, insideHorizontal: NO_BORDER, insideVertical: NO_BORDER },
+        rows: [new TableRow({
+          children: [
+            new TableCell({ width: { size: 55, type: WidthType.PERCENTAGE }, children: [new Paragraph({ children: [run("")] })] }),
+            new TableCell({ width: { size: 45, type: WidthType.PERCENTAGE }, children: signatureCellChildren }),
+          ],
+        })],
+      })
+    : null;
+
+  const signatureTable = table5 ?? block3 ?? singleOrPesertaTable!;
 
   const doc = new Document({
     sections: [{
@@ -142,17 +238,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
         ...closingParagraphs,
         new Paragraph({ spacing, children: [run("")] }),
         new Paragraph({ spacing, children: [run("")] }),
-        // Blok tanda tangan: sisi kanan halaman, teks di dalam blok rata kiri.
-        new Table({
-          width: { size: 100, type: WidthType.PERCENTAGE },
-          borders: { top: NO_BORDER, bottom: NO_BORDER, left: NO_BORDER, right: NO_BORDER, insideHorizontal: NO_BORDER, insideVertical: NO_BORDER },
-          rows: [new TableRow({
-            children: [
-              new TableCell({ width: { size: 55, type: WidthType.PERCENTAGE }, children: [new Paragraph({ children: [run("")] })] }),
-              new TableCell({ width: { size: 45, type: WidthType.PERCENTAGE }, children: signatureCellChildren }),
-            ],
-          })],
-        }),
+        signatureTable,
       ],
     }],
   });

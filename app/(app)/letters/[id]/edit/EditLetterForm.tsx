@@ -2,7 +2,8 @@
 
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { LETTER_TEMPLATES, fillTemplate, fmtTanggalPanjang, letterHeaderFor, splitParagraphs } from "@/lib/letter-templates";
+import { LETTER_TEMPLATES, LETTER_CATEGORIES, fillTemplate, fmtTanggalPanjang, letterHeaderFor, splitParagraphs } from "@/lib/letter-templates";
+import { signerNameOr, signerNipLine, type SignatureData } from "@/lib/letter-signature";
 import { updateLetterAction } from "../../actions";
 
 type LetterDraft = {
@@ -15,8 +16,8 @@ type LetterDraft = {
 };
 
 export default function EditLetterForm({
-  letter, bumdNama, jabatan, kopUrl,
-}: { letter: LetterDraft; bumdNama: string; jabatan: string; kopUrl: string }) {
+  letter, bumdNama, jabatan, dasarHukum, kopUrl, signature,
+}: { letter: LetterDraft; bumdNama: string; jabatan: string; dasarHukum: string; kopUrl: string; signature: SignatureData }) {
   const router = useRouter();
   const [jenisId, setJenisId] = useState(letter.jenis_surat);
   const [nomor, setNomor] = useState(letter.nomor);
@@ -27,6 +28,7 @@ export default function EditLetterForm({
   const [msg, setMsg] = useState<{ type: "ok" | "error"; text: string } | null>(null);
 
   const tpl = LETTER_TEMPLATES.find((t) => t.id === jenisId) ?? LETTER_TEMPLATES[0];
+  const sig = signature;
 
   const preview = useMemo(() => {
     const panitia = `Panitia Seleksi ${jabatan} ${bumdNama}`;
@@ -37,12 +39,12 @@ export default function EditLetterForm({
       NAMA_PESERTA: namaPeserta.trim() || "[Nama Peserta]",
       JABATAN: jabatan,
       PERIODE: periode.trim() || "-",
-      DASAR_HUKUM: "—",
+      DASAR_HUKUM: dasarHukum || "—",
       PANITIA: panitia,
       TIM_UKK: "Tim Uji Kompetensi dan Kelayakan",
     };
     return { body: fillTemplate(tpl.template, data), panitia, data, header: letterHeaderFor(tpl, data) };
-  }, [tpl, nomor, tanggal, namaPeserta, periode, jabatan, bumdNama]);
+  }, [tpl, nomor, tanggal, namaPeserta, periode, jabatan, bumdNama, dasarHukum]);
 
   async function handleSubmit(formData: FormData) {
     setSaving(true);
@@ -64,7 +66,13 @@ export default function EditLetterForm({
         <div>
           <label className="block text-xs font-semibold mb-1">Jenis Surat</label>
           <select name="jenis_surat" value={jenisId} onChange={(e) => setJenisId(e.target.value)} className="w-full border border-gray-200 rounded-md px-2.5 py-1.5 text-sm">
-            {LETTER_TEMPLATES.map((t) => <option key={t.id} value={t.id}>{t.nama}</option>)}
+            {LETTER_CATEGORIES.map((kategori) => (
+              <optgroup key={kategori} label={kategori}>
+                {LETTER_TEMPLATES.filter((t) => t.kategori === kategori).map((t) => (
+                  <option key={t.id} value={t.id}>{t.nama}</option>
+                ))}
+              </optgroup>
+            ))}
           </select>
         </div>
         <div>
@@ -126,20 +134,67 @@ export default function EditLetterForm({
         {preview.header && (
           <p className="mb-4" style={{ whiteSpace: "pre-line" }}>{`Ditetapkan di Kota Batu\npada tanggal ${preview.data.TANGGAL}`}</p>
         )}
-        <div className="mt-8" style={{ marginLeft: "55%", width: "45%", textAlign: "left" }}>
-          {tpl.signatureRole === "peserta" ? (
-            <>
-              <p>Yang membuat pernyataan,</p>
-              <p className="mt-14 font-bold underline">( {preview.data.NAMA_PESERTA} )</p>
-            </>
-          ) : (
-            <>
-              <p>{preview.panitia},</p>
-              <p className="mt-14 font-bold underline">( ................................................ )</p>
-              <p>Ketua Panitia Seleksi</p>
-            </>
-          )}
-        </div>
+        {tpl.signature.kind === "peserta" && (
+          <div className="mt-8" style={{ marginLeft: "55%", width: "45%", textAlign: "left" }}>
+            <p>Yang membuat pernyataan,</p>
+            <p className="mt-14 font-bold underline">( {preview.data.NAMA_PESERTA} )</p>
+          </div>
+        )}
+        {tpl.signature.kind === "single" && (
+          <div className="mt-8" style={{ marginLeft: "55%", width: "45%", textAlign: "left" }}>
+            <p>{preview.panitia},</p>
+            <p className="mt-14 font-bold underline">( {signerNameOr(sig.ketua)} )</p>
+            <p>Ketua Panitia Seleksi</p>
+            <p>{signerNipLine(sig.ketua)}</p>
+          </div>
+        )}
+        {tpl.signature.kind === "table5" && (
+          <table className="mt-8 w-full text-xs border-collapse" style={{ border: "1px solid #333" }}>
+            <thead>
+              <tr>
+                <th className="border border-gray-800 px-2 py-1 w-8">No</th>
+                <th className="border border-gray-800 px-2 py-1">Nama</th>
+                <th className="border border-gray-800 px-2 py-1">Jabatan</th>
+                <th className="border border-gray-800 px-2 py-1">Tanda Tangan</th>
+              </tr>
+            </thead>
+            <tbody>
+              {[
+                { jabatan: "Ketua Pansel", signer: sig.ketua },
+                { jabatan: "Sekretariat Pansel", signer: sig.sekretaris },
+                { jabatan: "Anggota", signer: sig.anggota[0] ?? null },
+                { jabatan: "Anggota", signer: sig.anggota[1] ?? null },
+                { jabatan: "Anggota", signer: sig.anggota[2] ?? null },
+              ].map((row, i) => (
+                <tr key={i}>
+                  <td className="border border-gray-800 px-2 py-1 text-center">{i + 1}</td>
+                  <td className="border border-gray-800 px-2 py-1">{signerNameOr(row.signer)}</td>
+                  <td className="border border-gray-800 px-2 py-1">{row.jabatan}</td>
+                  <td className="border border-gray-800 px-2 py-1">&nbsp;</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+        {tpl.signature.kind === "block3" && (
+          <table className="mt-8 w-full text-xs border-collapse" style={{ border: "1px solid #333" }}>
+            <tbody>
+              <tr>
+                {[
+                  { label: "KETUA PANITIA SELEKSI", signer: sig.ketua },
+                  { label: "SEKRETARIS PANITIA SELEKSI", signer: sig.sekretaris },
+                  { label: "ANGGOTA/PEJABAT TERKAIT", signer: sig.anggota[0] ?? null },
+                ].map((col, i) => (
+                  <td key={i} className="border border-gray-800 px-2 py-2 text-center align-top w-1/3">
+                    <div className="font-bold mb-10">{col.label}</div>
+                    <div className="font-bold underline">{signerNameOr(col.signer)}</div>
+                    <div>{signerNipLine(col.signer)}</div>
+                  </td>
+                ))}
+              </tr>
+            </tbody>
+          </table>
+        )}
       </div>
     </div>
   );

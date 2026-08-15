@@ -4,12 +4,17 @@ import { createUserAction, toggleUserActiveAction } from "./actions";
 import { ROLE_LABEL, type AppRole } from "@/lib/rbac";
 import DeleteUserButton from "./DeleteUserButton";
 
-const EXPECTED: Record<string, number> = { SYSTEM_ADMIN: 1, PANITIA_SELEKSI: 2, TIM_UKK: 5 };
+// Panitia Seleksi terdiri dari 5 orang — Ketua, Sekretaris, dan 3 Anggota —
+// sesuai struktur yang dipakai di seluruh naskah dinas resmi (Berita Acara,
+// Pengumuman, dst; lihat lib/letter-templates.ts). Tim UKK tetap 5 orang.
+const EXPECTED: Record<string, number> = { SYSTEM_ADMIN: 1, PANITIA_SELEKSI: 5, TIM_UKK: 5 };
 
 // Admin only creates accounts for Panitia Seleksi and Tim UKK. Peserta
 // accounts are self-registered via /daftar (nama lengkap, username, email,
 // nomor telepon); Admin has no path to create a PESERTA account here.
 const CREATABLE_ROLES: AppRole[] = ["PANITIA_SELEKSI", "TIM_UKK"];
+
+const JABATAN_TIM_LABEL: Record<string, string> = { KETUA: "Ketua", SEKRETARIS: "Sekretaris", ANGGOTA: "Anggota" };
 
 export default async function UsersPage() {
   const supabase = await createClient();
@@ -35,7 +40,7 @@ export default async function UsersPage() {
         })}
       </div>
 
-      <form action={createUserAction} className="bg-white border border-gray-200 rounded-md p-5 mb-6 grid grid-cols-5 gap-3 items-end">
+      <form action={createUserAction} className="bg-white border border-gray-200 rounded-md p-5 mb-6 grid grid-cols-2 md:grid-cols-4 gap-3 items-end">
         <div><label className="block text-xs font-semibold mb-1">Nama</label><input name="name" required className="w-full border border-gray-200 rounded-md px-2.5 py-1.5 text-sm" /></div>
         <div><label className="block text-xs font-semibold mb-1">Username</label><input name="username" required className="w-full border border-gray-200 rounded-md px-2.5 py-1.5 text-sm" /></div>
         <div><label className="block text-xs font-semibold mb-1">Peran</label>
@@ -44,13 +49,25 @@ export default async function UsersPage() {
           </select>
         </div>
         <div><label className="block text-xs font-semibold mb-1">Unit Kerja</label><input name="unit" className="w-full border border-gray-200 rounded-md px-2.5 py-1.5 text-sm" /></div>
-        <button type="submit" className="bg-navy-900 text-white text-sm font-semibold rounded-md px-4 py-2">Tambah User</button>
+        <div><label className="block text-xs font-semibold mb-1">NIP (untuk PNS)</label><input name="nip" placeholder="Kosongkan jika non-PNS" className="w-full border border-gray-200 rounded-md px-2.5 py-1.5 text-sm" /></div>
+        <div>
+          <label className="block text-xs font-semibold mb-1">Jabatan dalam Tim</label>
+          <select name="jabatan_tim" className="w-full border border-gray-200 rounded-md px-2.5 py-1.5 text-sm">
+            <option value="">— (khusus Panitia Seleksi) —</option>
+            <option value="KETUA">Ketua</option>
+            <option value="SEKRETARIS">Sekretaris</option>
+            <option value="ANGGOTA">Anggota</option>
+          </select>
+        </div>
+        <button type="submit" className="bg-navy-900 text-white text-sm font-semibold rounded-md px-4 py-2 h-fit">Tambah User</button>
       </form>
+      <p className="text-xs text-ink-500 -mt-4 mb-6">Untuk akun Panitia Seleksi, Jabatan dalam Tim (Ketua/Sekretaris/Anggota) wajib dipilih — dipakai untuk menarik Nama &amp; NIP secara otomatis ke tanda tangan naskah dinas.</p>
 
       <div className="bg-white border border-gray-200 rounded-md overflow-hidden">
         <table className="w-full text-sm">
           <thead><tr className="bg-navy-50 text-left text-[11px] uppercase text-ink-700">
             <th className="px-4 py-3">Nama</th><th className="px-4 py-3">Username</th><th className="px-4 py-3">Peran</th>
+            <th className="px-4 py-3">Jabatan dalam Tim</th><th className="px-4 py-3">NIP</th>
             <th className="px-4 py-3">Unit</th><th className="px-4 py-3">Status</th><th className="px-4 py-3"></th>
           </tr></thead>
           <tbody>
@@ -59,6 +76,8 @@ export default async function UsersPage() {
                 <td className="px-4 py-3">{u.name}</td>
                 <td className="px-4 py-3 font-mono text-xs">{u.username}</td>
                 <td className="px-4 py-3"><span className="text-[11px] bg-blue-50 text-blue-700 px-2 py-0.5 rounded-full">{ROLE_LABEL[u.role as AppRole]}</span></td>
+                <td className="px-4 py-3">{u.jabatan_tim ? JABATAN_TIM_LABEL[u.jabatan_tim] : "—"}</td>
+                <td className="px-4 py-3 font-mono text-xs">{u.nip || "—"}</td>
                 <td className="px-4 py-3">{u.unit}</td>
                 <td className="px-4 py-3">
                   <span className={`text-[11px] px-2 py-0.5 rounded-full font-semibold ${u.active ? "bg-green-50 text-green-700" : "bg-red-50 text-red-700"}`}>{u.active ? "Aktif" : "Nonaktif"}</span>

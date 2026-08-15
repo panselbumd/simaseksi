@@ -27,6 +27,8 @@ export async function createUserAction(formData: FormData) {
   const role = String(formData.get("role") || "");
   const unit = String(formData.get("unit") || "");
   const password = String(formData.get("password") || "password123");
+  const nip = String(formData.get("nip") || "").trim();
+  const jabatanTim = String(formData.get("jabatan_tim") || "").trim();
   if (!username || !name || !role) throw new Error("Nama, username, dan peran wajib diisi.");
 
   // Admin only creates Panitia Seleksi / Tim UKK accounts. Peserta accounts
@@ -34,6 +36,16 @@ export async function createUserAction(formData: FormData) {
   // here even though the UI dropdown already only offers these two roles.
   if (role !== "PANITIA_SELEKSI" && role !== "TIM_UKK") {
     throw new Error("Administrator Sistem hanya dapat membuat akun Panitia Seleksi atau Tim UKK. Akun Peserta dibuat sendiri oleh peserta melalui pendaftaran seleksi.");
+  }
+
+  // Jabatan dalam Tim (Ketua/Sekretaris/Anggota) hanya berlaku untuk akun
+  // Panitia Seleksi — lihat migration_0009_identitas_panitia.sql. Untuk
+  // Tim UKK/peran lain kolom ini selalu NULL.
+  if (jabatanTim && !["KETUA", "SEKRETARIS", "ANGGOTA"].includes(jabatanTim)) {
+    throw new Error("Jabatan dalam Tim tidak dikenali.");
+  }
+  if (role === "PANITIA_SELEKSI" && !jabatanTim) {
+    throw new Error("Jabatan dalam Tim (Ketua/Sekretaris/Anggota) wajib dipilih untuk akun Panitia Seleksi.");
   }
 
   // NOTE: no SYSTEM_ADMIN branch here — the guard above already restricts
@@ -48,6 +60,8 @@ export async function createUserAction(formData: FormData) {
 
   const { error: profileErr } = await admin.from("profiles").insert({
     id: data.user!.id, username, name, role, unit, active: true,
+    nip: nip || null,
+    jabatan_tim: role === "PANITIA_SELEKSI" ? jabatanTim : null,
   });
   if (profileErr) {
     // Roll back the orphaned auth user if the profile insert failed
@@ -73,7 +87,15 @@ export async function updateUserAction(userId: string, formData: FormData) {
   const role = String(formData.get("role") || "");
   const unit = String(formData.get("unit") || "");
   const newPassword = String(formData.get("password") || "").trim();
+  const nip = String(formData.get("nip") || "").trim();
+  const jabatanTim = String(formData.get("jabatan_tim") || "").trim();
   if (!name || !role) throw new Error("Nama dan peran wajib diisi.");
+  if (jabatanTim && !["KETUA", "SEKRETARIS", "ANGGOTA"].includes(jabatanTim)) {
+    throw new Error("Jabatan dalam Tim tidak dikenali.");
+  }
+  if (role === "PANITIA_SELEKSI" && !jabatanTim) {
+    throw new Error("Jabatan dalam Tim (Ketua/Sekretaris/Anggota) wajib dipilih untuk akun Panitia Seleksi.");
+  }
 
   const { data: target } = await admin.from("profiles").select("role").eq("id", userId).single();
   if (target?.role === "SYSTEM_ADMIN" && role !== "SYSTEM_ADMIN" && userId === adminId) {
@@ -84,8 +106,19 @@ export async function updateUserAction(userId: string, formData: FormData) {
     if ((count ?? 0) >= 1) throw new Error("Sistem hanya boleh memiliki 1 akun Administrator Sistem.");
   }
 
-  const { error } = await admin.from("profiles").update({ name, role, unit }).eq("id", userId);
+  const { error } = await admin.from("profiles").update({
+    name, role, unit,
+    nip: nip || null,
+    jabatan_tim: role === "PANITIA_SELEKSI" ? jabatanTim : null,
+  }).eq("id", userId);
   if (error) throw error;
+
+  // Sinkronkan Jabatan dalam Tim yang baru ke setiap keanggotaan Panitia
+  // yang sudah ada (selection_members.posisi) — lihat migration_0009.
+  if (role === "PANITIA_SELEKSI" && jabatanTim) {
+    await admin.from("selection_members").update({ posisi: jabatanTim })
+      .eq("user_id", userId).eq("member_role", "PANITIA_SELEKSI");
+  }
 
   if (newPassword) {
     const { error: pwErr } = await admin.auth.admin.updateUserById(userId, { password: newPassword });

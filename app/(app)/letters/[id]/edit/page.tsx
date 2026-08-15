@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { hasPermission, type AppRole } from "@/lib/rbac";
 import { kopBannerAssetFor } from "@/lib/letter-format";
+import { fetchSignatureData } from "@/lib/letter-signature";
 import EditLetterForm from "./EditLetterForm";
 
 export default async function EditLetterPage({ params }: { params: Promise<{ id: string }> }) {
@@ -22,6 +23,7 @@ export default async function EditLetterPage({ params }: { params: Promise<{ id:
   const sel = (letter as any).selections;
   const bumdNama: string = sel?.bumds?.nama || "-";
   const kopUrl = kopBannerAssetFor(bumdNama);
+  const signature = await fetchSignatureData(supabase, letter.selection_id);
 
   return (
     <div>
@@ -49,7 +51,9 @@ export default async function EditLetterPage({ params }: { params: Promise<{ id:
           }}
           bumdNama={bumdNama}
           jabatan={sel?.jabatan || "-"}
+          dasarHukum={sel?.dasar_hukum || "—"}
           kopUrl={kopUrl}
+          signature={signature}
         />
       )}
     </div>

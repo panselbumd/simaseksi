@@ -2,6 +2,7 @@ import { createClient } from "@/lib/supabase/server";
 import GeneratorForm from "./GeneratorForm";
 import { finalizeLetterAction, deleteLetterAction } from "./actions";
 import { kopBannerAssetFor } from "@/lib/letter-format";
+import { fetchSignatureData, type SignatureData } from "@/lib/letter-signature";
 
 export default async function LettersPage({ searchParams }: { searchParams?: Promise<{ selection?: string }> }) {
   // Defensive: on some client-triggered refreshes Next.js may not thread a
@@ -47,6 +48,14 @@ export default async function LettersPage({ searchParams }: { searchParams?: Pro
       kop_url: kopBannerAssetFor(s.bumds?.nama || ""),
     }));
 
+    // Data penanda tangan (Ketua/Sekretaris/Anggota/Tim UKK — Nama+NIP) per
+    // seleksi, untuk pratinjau blok tanda tangan yang nyata di GeneratorForm
+    // (bukan lagi titik-titik kosong).
+    const signatureBySelection: Record<string, SignatureData> = {};
+    for (const s of selections) {
+      signatureBySelection[s.id] = await fetchSignatureData(supabase, s.id);
+    }
+
     const { data: letters, error: lettersErr } = await supabase
       .from("letters")
       .select("id, nama_surat, nomor, tanggal, status, created_at, selection_id")
@@ -70,7 +79,7 @@ export default async function LettersPage({ searchParams }: { searchParams?: Pro
 
         {role === "PANITIA_SELEKSI" && selections.length > 0 && (
           <div className="mb-8">
-            <GeneratorForm selections={selections} initialSelectionId={preselectedSelectionId} />
+            <GeneratorForm selections={selections} initialSelectionId={preselectedSelectionId} signatureBySelection={signatureBySelection} />
           </div>
         )}
         {role === "PANITIA_SELEKSI" && selections.length === 0 && (
