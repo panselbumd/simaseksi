@@ -41,7 +41,7 @@ export default async function LetterPrintPage({ params }: { params: Promise<{ id
       <style>{`
         @page { size: A4; margin: 1.5cm 2cm 2cm 2.5cm; }
         .naskah { font-family: Arial, Helvetica, sans-serif; font-size: 11pt; line-height: 1.5; text-align: justify; }
-        .naskah .kop { border-bottom:1.5pt solid #222; padding-bottom:8px; margin-bottom:8px; text-align:center; }
+        .naskah .kop { padding-bottom:8px; margin-bottom:8px; text-align:center; }
         .naskah .kop img { width:100%; height:auto; display:block; }
         .naskah .kop-gap { margin-bottom: 1.5em; }
         .naskah .judul-blok { text-align:center; margin-bottom: 1.5em; }

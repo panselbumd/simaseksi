@@ -20,20 +20,37 @@ html.dark { color-scheme: dark; }
 .dark .bg-navy-50 { background-color: #16213a !important; }
 .dark .bg-navy-100 { background-color: #1c2c4a !important; }
 .dark .bg-amber-50 { background-color: #2a2313 !important; }
+.dark .bg-amber-100 { background-color: #3a2f10 !important; }
 .dark .bg-green-50 { background-color: #10261c !important; }
 .dark .bg-red-50 { background-color: #2a1416 !important; }
 .dark .bg-blue-50 { background-color: #10203a !important; }
+.dark .bg-gold-100 { background-color: #3a2f10 !important; }
 .dark .border-gray-100 { border-color: #223255 !important; }
 .dark .border-gray-200 { border-color: #263a5f !important; }
 .dark .border-gray-300 { border-color: #2c4066 !important; }
 .dark .border-gray-800 { border-color: #3a4d75 !important; }
 .dark .border-amber-200 { border-color: #4a3d1e !important; }
+.dark .border-red-200 { border-color: #5c2328 !important; }
+.dark .border-green-200 { border-color: #1e4430 !important; }
+.dark .border-navy-100, .dark .border-navy-200, .dark .border-navy-300, .dark .border-navy-600 { border-color: #2c4066 !important; }
+/* Teks gelap (navy/abu-abu/merah/hijau/biru tua) hampir tak terbaca di atas
+   latar gelap — dipetakan ke versi terang yang setara di mode gelap. */
 .dark .text-ink-900 { color: #eef2f9 !important; }
 .dark .text-ink-700 { color: #c3ccdc !important; }
 .dark .text-ink-500 { color: #93a1ba !important; }
 .dark .text-ink-400 { color: #7a8aa8 !important; }
-.dark .text-amber-800 { color: #e8c874 !important; }
+.dark .text-navy-950, .dark .text-navy-900 { color: #eef2f9 !important; }
+.dark .text-navy-800 { color: #dbe4f2 !important; }
+.dark .text-navy-700 { color: #c3ccdc !important; }
 .dark .text-gray-700 { color: #c3ccdc !important; }
+.dark .text-gray-600 { color: #a9b4c9 !important; }
+.dark .text-gray-500 { color: #93a1ba !important; }
+.dark .text-gray-400 { color: #7a8aa8 !important; }
+.dark .text-red-700, .dark .text-red-600 { color: #f2a3a8 !important; }
+.dark .text-green-800, .dark .text-green-700, .dark .text-green-600 { color: #7fe3ac !important; }
+.dark .text-blue-700 { color: #8fc0f2 !important; }
+.dark .text-amber-800 { color: #e8c874 !important; }
+.dark .text-amber-700 { color: #e0be6c !important; }
 .dark h1, .dark h2, .dark h3, .dark h4 { color: #eef2f9 !important; }
 .dark input, .dark select, .dark textarea {
   background-color: #16213a !important;
@@ -41,4 +58,10 @@ html.dark { color-scheme: dark; }
   color: #eef2f9 !important;
 }
 .dark ::placeholder { color: #6b7a99 !important; }
+.dark .hover\:bg-gray-50:hover { background-color: #1a2740 !important; }
+.dark .hover\:bg-navy-50:hover { background-color: #1c2c4a !important; }
+.dark .hover\:bg-navy-100:hover { background-color: #223255 !important; }
+.dark .hover\:bg-red-50:hover { background-color: #3a1c1f !important; }
+.dark .hover\:bg-amber-50:hover { background-color: #3a2f10 !important; }
+.dark .hover\:text-navy-900:hover { color: #eef2f9 !important; }
 /* Sidebar/header stay navy in both modes by design — no override needed. */

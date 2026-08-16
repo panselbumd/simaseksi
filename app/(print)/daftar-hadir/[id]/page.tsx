@@ -38,7 +38,7 @@ export default async function DaftarHadirPrintPage({ params }: { params: Promise
       <style>{`
         @page { size: A4; margin: 1.5cm 2cm 2cm 2.5cm; }
         .naskah { font-family: Arial, Helvetica, sans-serif; font-size: 11pt; line-height: 1.5; }
-        .naskah .kop { border-bottom:1.5pt solid #222; padding-bottom:8px; margin-bottom:8px; text-align:center; }
+        .naskah .kop { padding-bottom:8px; margin-bottom:8px; text-align:center; }
         .naskah .kop img { width:100%; height:auto; display:block; }
         .naskah .judul-blok { text-align:center; margin: 1.2em 0 1.2em; }
         .naskah .judul-blok .judul { font-weight:700; text-decoration:underline; text-transform:uppercase; font-size: 13pt; }

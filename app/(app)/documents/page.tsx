@@ -20,7 +20,7 @@ export default async function DocumentsPage() {
 
   if (role === "PESERTA") {
     const { data: applicant } = await supabase
-      .from("applicants").select("id, selection_id, selections(nama)").eq("user_id", user!.id).maybeSingle();
+      .from("applicants").select("id, selection_id, nomor_registrasi, kode_peserta, status, selections(nama)").eq("user_id", user!.id).maybeSingle();
 
     if (!applicant) {
       return (
@@ -37,7 +37,20 @@ export default async function DocumentsPage() {
     return (
       <div>
         <h1 className="text-2xl font-display font-bold text-navy-900 mb-1">Dokumen Persyaratan</h1>
-        <p className="text-sm text-ink-500 mb-6">{(applicant as any).selections?.nama} — unggah seluruh berkas persyaratan di bawah ini (maks. 5MB per berkas, PDF/JPG/PNG).</p>
+        <p className="text-sm text-ink-500 mb-4">{(applicant as any).selections?.nama} — unggah seluruh berkas persyaratan di bawah ini (maks. 5MB per berkas, PDF/JPG/PNG).</p>
+
+        <div className="grid grid-cols-2 gap-3 mb-6">
+          <div className="bg-white border border-gray-200 rounded-md p-4">
+            <div className="text-[11px] uppercase tracking-wide text-ink-500 mb-1">Nomor Registrasi</div>
+            <div className="font-display font-bold text-navy-900">{applicant.nomor_registrasi || "—"}</div>
+          </div>
+          <div className="bg-white border border-gray-200 rounded-md p-4">
+            <div className="text-[11px] uppercase tracking-wide text-ink-500 mb-1">Kode Peserta</div>
+            <div className="font-display font-bold text-navy-900">
+              {applicant.kode_peserta || <span className="font-normal text-ink-500">Belum diterbitkan — menunggu seluruh berkas disetujui Panitia</span>}
+            </div>
+          </div>
+        </div>
 
         <div className="flex flex-col gap-3">
           {REQUIRED_DOCUMENTS.map((jenis) => {
@@ -73,6 +86,32 @@ export default async function DocumentsPage() {
 
   const canVerify = role === "PANITIA_SELEKSI";
 
+  // Rekap by sistem: kelengkapan berkas dihitung otomatis per peserta dari
+  // baris documents di atas (bukan dihitung manual oleh Panitia) — begitu
+  // seluruh dokumen wajib seorang peserta APPROVED, Kode Peserta sudah
+  // otomatis diterbitkan oleh verifyDocumentAction (lihat actions.ts) dan
+  // tampil di sini.
+  const { data: applicants } = await supabase
+    .from("applicants")
+    .select("id, nama, nomor_registrasi, kode_peserta, status, selection_id, selections(nama)")
+    .order("submitted_at", { ascending: false });
+
+  const docsByApplicant = new Map<string, { jenis: string; status: string }[]>();
+  const { data: docsForRecap } = await supabase
+    .from("documents").select("owner_id, jenis, status").eq("owner_type", "APPLICANT");
+  for (const d of docsForRecap ?? []) {
+    const arr = docsByApplicant.get(d.owner_id) ?? [];
+    arr.push({ jenis: d.jenis, status: d.status });
+    docsByApplicant.set(d.owner_id, arr);
+  }
+
+  const APPLICANT_STATUS_LABEL: Record<string, string> = {
+    VERIFICATION: "Verifikasi Berjalan", CANDIDATE: "Memenuhi Syarat (Kandidat)", REJECTED: "Tidak Memenuhi Syarat",
+  };
+  const APPLICANT_STATUS_COLOR: Record<string, string> = {
+    VERIFICATION: "bg-blue-50 text-blue-700", CANDIDATE: "bg-green-50 text-green-700", REJECTED: "bg-red-50 text-red-700",
+  };
+
   return (
     <div>
       <h1 className="text-2xl font-display font-bold text-navy-900 mb-1">Verifikasi Dokumen</h1>
@@ -82,6 +121,43 @@ export default async function DocumentsPage() {
           : "Tampilan baca-saja — hanya Panitia Seleksi yang memiliki hak verifikasi (RLS documents_verify_panitia)."}
       </p>
 
+      <h2 className="text-sm font-display font-bold text-navy-900 mb-2">Rekap Kelengkapan Peserta (otomatis)</h2>
+      <div className="bg-white border border-gray-200 rounded-md overflow-hidden mb-8">
+        <table className="w-full text-sm">
+          <thead><tr className="bg-navy-50 text-left text-[11px] uppercase text-ink-700">
+            <th className="px-4 py-3">Peserta</th><th className="px-4 py-3">Seleksi</th>
+            <th className="px-4 py-3">No. Registrasi</th><th className="px-4 py-3">Kode Peserta</th>
+            <th className="px-4 py-3">Berkas Disetujui</th><th className="px-4 py-3">Status</th>
+          </tr></thead>
+          <tbody>
+            {applicants?.map((a: any) => {
+              const list = docsByApplicant.get(a.id) ?? [];
+              const approvedCount = REQUIRED_DOCUMENTS.filter((j) => list.some((d) => d.jenis === j && d.status === "APPROVED")).length;
+              const complete = approvedCount === REQUIRED_DOCUMENTS.length;
+              return (
+                <tr key={a.id} className="border-t border-gray-100">
+                  <td className="px-4 py-3 font-medium">{a.nama}</td>
+                  <td className="px-4 py-3">{a.selections?.nama}</td>
+                  <td className="px-4 py-3 font-mono text-xs">{a.nomor_registrasi || "—"}</td>
+                  <td className="px-4 py-3 font-mono text-xs">{a.kode_peserta || "—"}</td>
+                  <td className="px-4 py-3">
+                    <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full ${complete ? "bg-green-50 text-green-700" : "bg-gray-100 text-gray-500"}`}>
+                      {approvedCount}/{REQUIRED_DOCUMENTS.length}
+                    </span>
+                  </td>
+                  <td className="px-4 py-3"><span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full ${APPLICANT_STATUS_COLOR[a.status]}`}>{APPLICANT_STATUS_LABEL[a.status] ?? a.status}</span></td>
+                </tr>
+              );
+            }) ?? null}
+            {(!applicants || applicants.length === 0) && (
+              <tr><td colSpan={6} className="px-4 py-8 text-center text-ink-500">Belum ada peserta terdaftar.</td></tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+      <p className="text-xs text-ink-500 -mt-6 mb-8">Kode Peserta diterbitkan otomatis oleh sistem begitu seluruh {REQUIRED_DOCUMENTS.length} dokumen wajib seorang peserta berstatus Disetujui — tidak perlu langkah manual tambahan.</p>
+
+      <h2 className="text-sm font-display font-bold text-navy-900 mb-2">Detail per Dokumen</h2>
       <div className="bg-white border border-gray-200 rounded-md overflow-hidden">
         <table className="w-full text-sm">
           <thead><tr className="bg-navy-50 text-left text-[11px] uppercase text-ink-700">

@@ -3,6 +3,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 import { sendStageProgressionEmail } from "@/lib/email";
+import { kodePesertaPrefix, buildKodePeserta } from "@/lib/kode-peserta";
 import { REQUIRED_DOCUMENTS } from "./constants";
 
 // Peserta: unggah/perbarui satu jenis dokumen miliknya sendiri, untuk
@@ -66,11 +67,14 @@ export async function verifyDocumentAction(documentId: string, status: string, f
   });
 
   // Peserta lolos tahap Verifikasi Dokumen begitu SEMUA dokumen wajibnya
-  // berstatus APPROVED — kirim notifikasi email sekali saat kondisi ini
-  // baru saja terpenuhi. (Ini satu-satunya titik "lolos tahapan" yang
-  // sudah ada implementasinya di codebase; tahap UKK/Wawancara/Keputusan
-  // belum punya aksi "tandai lolos" eksplisit — lihat catatan di
-  // lib/email.ts / dokumentasi go-live untuk pola yang sama.)
+  // berstatus APPROVED. Begitu itu terjadi, sistem otomatis: (1) memberi
+  // Kode Peserta (format by sistem: {inisial jabatan}-{inisial BUMD}-
+  // {tahun}-{urut} — lihat lib/kode-peserta.ts), (2) menandai applicant
+  // sebagai CANDIDATE, dan (3) mempromosikannya ke tabel candidates —
+  // sehingga peserta langsung tampil di modul Kandidat/UKK/Wawancara
+  // tanpa langkah manual tambahan dari Panitia. Idempotent: applicant yang
+  // sudah punya kode_peserta dilewati (mis. verifier menekan tombol lagi,
+  // atau salah satu dokumen di-APPROVE ulang).
   if (status === "APPROVED" && doc) {
     const { data: allDocs } = await supabase
       .from("documents").select("jenis, status")
@@ -80,15 +84,44 @@ export async function verifyDocumentAction(documentId: string, status: string, f
 
     if (allRequiredApproved) {
       const { data: applicant } = await supabase
-        .from("applicants").select("nama, email, selections(nama)")
+        .from("applicants")
+        .select("id, nama, email, user_id, kode_peserta, selection_id, selections(nama, jabatan, bumds(nama))")
         .eq("id", doc.owner_id).single();
-      if (applicant) {
-        await sendStageProgressionEmail({
-          to: applicant.email,
-          nama: applicant.nama,
-          selectionNama: (applicant as any).selections?.nama ?? "",
-          stage: "VERIFICATION_PASSED",
-        });
+
+      if (applicant && !applicant.kode_peserta) {
+        const sel = (applicant as any).selections;
+        const jabatan: string = sel?.jabatan || "-";
+        const bumdNama: string = sel?.bumds?.nama || "-";
+        const tahun = new Date().getFullYear();
+        const prefix = kodePesertaPrefix(jabatan, bumdNama, tahun);
+
+        const { count } = await supabase
+          .from("applicants").select("id", { count: "exact", head: true })
+          .like("kode_peserta", `${prefix}-%`);
+        const kodePeserta = buildKodePeserta(jabatan, bumdNama, tahun, (count ?? 0) + 1);
+
+        const { error: promoteErr } = await supabase.from("applicants")
+          .update({ status: "CANDIDATE", kode_peserta: kodePeserta })
+          .eq("id", applicant.id);
+        if (!promoteErr) {
+          await supabase.from("candidates").insert({
+            selection_id: applicant.selection_id, source_type: "APPLICANT", source_id: applicant.id,
+            user_id: applicant.user_id, nama: applicant.nama, status: "ACTIVE",
+          });
+          await supabase.rpc("write_audit_log", {
+            p_module: "Applicant", p_action: "AUTO_QUALIFY_KODE_PESERTA", p_old_value: "-", p_new_value: kodePeserta, p_selection: applicant.selection_id,
+          });
+        }
+
+        if (applicant) {
+          await sendStageProgressionEmail({
+            to: applicant.email,
+            nama: applicant.nama,
+            selectionNama: sel?.nama ?? "",
+            stage: "VERIFICATION_PASSED",
+            kodePeserta,
+          });
+        }
       }
     }
   }

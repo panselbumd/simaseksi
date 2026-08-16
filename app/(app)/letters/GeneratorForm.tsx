@@ -246,7 +246,7 @@ export default function GeneratorForm({
             className="bg-white border border-gray-200 rounded-md p-8"
             style={{ fontFamily: "Arial, Helvetica, sans-serif", fontSize: "11pt", lineHeight: 1.5, textAlign: "justify" }}
           >
-            <div className="border-b border-gray-800 pb-3 mb-3 text-center">
+            <div className="pb-3 mb-3 text-center">
               {sel.kop_url && <img src={sel.kop_url} alt={`Kop Surat ${sel.bumd_nama}`} className="w-full h-auto" />}
             </div>
             <div className="mb-4" />{/* jarak kop ke isi surat: 1.5 spasi */}

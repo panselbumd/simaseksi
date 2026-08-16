@@ -88,7 +88,6 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
   if (kopImage) {
     kopParagraphs.push(new Paragraph({
       alignment: AlignmentType.CENTER,
-      border: { bottom: { style: BorderStyle.SINGLE, size: 6, space: 4, color: "222222" } },
       children: [new ImageRun({ data: kopImage, transformation: { width: kopImgWidthPx, height: kopImgHeightPx }, type: "jpg" })],
     }));
   }

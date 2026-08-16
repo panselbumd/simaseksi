@@ -209,7 +209,7 @@ export default function EditLetterForm({
         className="bg-white border border-gray-200 rounded-md p-8 h-fit"
         style={{ fontFamily: "Arial, Helvetica, sans-serif", fontSize: "11pt", lineHeight: 1.5, textAlign: "justify" }}
       >
-        <div className="border-b border-gray-800 pb-3 mb-3 text-center">
+        <div className="pb-3 mb-3 text-center">
           <img src={kopUrl} alt={`Kop Surat ${bumdNama}`} className="w-full h-auto" />
         </div>
         <div className="mb-4" />

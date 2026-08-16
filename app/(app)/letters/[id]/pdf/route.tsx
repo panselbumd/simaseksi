@@ -41,7 +41,7 @@ function makeStyles(fontFamily: string) {
       fontSize: 11,
       lineHeight: 1.5,
     },
-    kopRow: { borderBottom: "1pt solid #333", paddingBottom: 8, marginBottom: 8 },
+    kopRow: { paddingBottom: 8, marginBottom: 8 },
     kopImg: { width: "100%" },
     spacerLine: { marginBottom: 16 }, // ~1.5 line-height gap between kop & body
     right: { textAlign: "right", marginBottom: 12 },

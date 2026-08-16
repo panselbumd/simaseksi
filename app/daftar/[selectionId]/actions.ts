@@ -69,7 +69,7 @@ export async function registerAction(
     return { error: `Gagal menyimpan profil: ${profileErr.message}` };
   }
 
-  const { error: applicantErr } = await admin.from("applicants").insert({
+  const { data: insertedApplicant, error: applicantErr } = await admin.from("applicants").insert({
     selection_id: selectionId,
     user_id: userId,
     nama,
@@ -81,7 +81,7 @@ export async function registerAction(
     email,
     telepon: telepon || null,
     status: "VERIFICATION",
-  });
+  }).select("nomor_registrasi").single();
   if (applicantErr) {
     // Account exists but application failed — leave the account (they can
     // still log in) but surface the error so they can retry/contact admin.
@@ -96,5 +96,9 @@ export async function registerAction(
     module: "Applicant", action: "PUBLIC_REGISTER", old_value: "-", new_value: username,
   });
 
-  redirect(`/daftar/${selectionId}/berhasil`);
+  // Nomor Registrasi (format by sistem — lihat trigger
+  // generate_nomor_registrasi(), migration_0011) sudah pasti terisi begitu
+  // insert di atas sukses. Ditampilkan di halaman berhasil lewat query
+  // string supaya halaman itu tidak perlu query ulang / login dulu.
+  redirect(`/daftar/${selectionId}/berhasil?reg=${encodeURIComponent(insertedApplicant?.nomor_registrasi || "")}`);
 }

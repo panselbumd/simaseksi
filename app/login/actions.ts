@@ -23,7 +23,21 @@ export async function loginAction(_prevState: LoginState, formData: FormData): P
 
   const { error: signInError } = await supabase.auth.signInWithPassword({ email, password });
   if (signInError) {
-    return { error: "Password salah. Silakan coba kembali." };
+    // Pesan sebelumnya SELALU menampilkan "Password salah" untuk jenis
+    // kegagalan apa pun dari signInWithPassword — termasuk penyebab yang
+    // sama sekali bukan password (project Supabase pause/nonaktif, email
+    // belum dikonfirmasi, akun diblokir sementara, kredensial API salah,
+    // dsb) — sehingga menyesatkan saat mendiagnosis masalah login.
+    // Sekarang pesan Supabase yang sesungguhnya ditampilkan supaya jelas
+    // penyebabnya, dengan terjemahan untuk kasus paling umum.
+    const raw = signInError.message || "";
+    if (/invalid login credentials/i.test(raw)) {
+      return { error: "Password salah, atau akun belum pernah login sebelumnya dengan password ini. Silakan coba kembali." };
+    }
+    if (/email not confirmed/i.test(raw)) {
+      return { error: "Akun belum terverifikasi (email not confirmed) di Supabase Auth. Hubungi Administrator Sistem." };
+    }
+    return { error: `Gagal masuk: ${raw || "kesalahan tidak diketahui"}. Jika ini muncul untuk SEMUA akun (bukan hanya satu), kemungkinan besar penyebabnya di sisi konfigurasi Supabase (project nonaktif/pause, atau environment variable Supabase URL/Anon Key di Vercel tidak sesuai), bukan di kode aplikasi.` };
   }
 
   await supabase.rpc("write_audit_log", {
