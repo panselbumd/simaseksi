@@ -45,8 +45,8 @@ const STAGE_LABEL: Record<string, string> = {
 // see the trigger points documented in each server action file
 // (documents/actions.ts, decision/actions.ts, ...).
 export async function sendStageProgressionEmail({
-  to, nama, selectionNama, stage,
-}: { to: string | null | undefined; nama: string; selectionNama: string; stage: keyof typeof STAGE_LABEL }) {
+  to, nama, selectionNama, stage, kodePeserta,
+}: { to: string | null | undefined; nama: string; selectionNama: string; stage: keyof typeof STAGE_LABEL; kodePeserta?: string | null }) {
   if (!to) return { sent: false, reason: "applicant has no email on file" };
   const stageLabel = STAGE_LABEL[stage] ?? stage;
   return sendEmail({
@@ -56,6 +56,7 @@ export async function sendStageProgressionEmail({
       <p>Yth. ${nama},</p>
       <p>Selamat, Anda dinyatakan <strong>lolos tahap ${stageLabel}</strong> pada proses seleksi
       <strong>${selectionNama}</strong>.</p>
+      ${kodePeserta ? `<p>Kode Peserta Anda: <strong>${kodePeserta}</strong> — mohon dicatat, kode ini dipakai pada seluruh tahapan seleksi selanjutnya.</p>` : ""}
       <p>Silakan masuk ke akun SIMASEKSI Anda untuk melihat informasi tahap selanjutnya.</p>
       <p>Salam,<br/>Panitia Seleksi</p>
     `,
